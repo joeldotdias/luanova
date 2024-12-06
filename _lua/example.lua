@@ -15,6 +15,8 @@ function check_number(num)
 	end
 end
 
+M.mb()
+
 print("Sum of a and b is: " .. add(a, b))
 check_number(a)
 check_number(b)

@@ -7,8 +7,9 @@
 static void print_ast_node(ASTNode* node, size_t indent);
 static void print_chunk(Chunk* chunk, size_t indent);
 static void print_assignment(Assignment* asgmt, size_t indent);
+static void print_func_expr(FuncExpr* func_expr, size_t indent);
 static void print_func_call(FuncCall* func_call, size_t indent);
-static void print_var_node(VarNode* var, size_t indent);
+static void print_symbol(Symbol* var, size_t indent);
 static void print_str_literal(StrLiteral* str, size_t indent);
 static const char* binary_op_str(BinaryOperator op);
 static const char* unary_op_str(UnaryOperator op);
@@ -34,11 +35,14 @@ static void print_ast_node(ASTNode* node, size_t indent) {
         case ASTNODE_FUNC_CALL_STMT:
             print_func_call(&node->func_call, indent);
             break;
-        case ASTNODE_VAR:
-            print_var_node(&node->var_node, indent);
+        case ASTNODE_SYMBOL:
+            print_symbol(&node->symbol, indent);
             break;
         case ASTNODE_STR_LITERAL:
             print_str_literal(&node->str_literal, indent);
+            break;
+        case ASTNODE_FUNC_EXPR:
+            print_func_expr(&node->func_decl, indent);
             break;
         default:
             UNIMPLEMENTED();
@@ -46,55 +50,52 @@ static void print_ast_node(ASTNode* node, size_t indent) {
 }
 
 static void print_chunk(Chunk* chunk, size_t indent) {
-    INDENT(indent);
-    printf("CHUNK:\n");
+    INDENTED(indent, "CHUNK:");
     for(size_t i = 0; i < chunk->stmt_count; i++) {
         print_ast_node(chunk->stmteez[i], indent + 1);
     }
 }
 
 static void print_assignment(Assignment* asgmt, size_t indent) {
-    INDENT(indent);
-    printf("ASSIGNMENT:\n");
+    INDENTED(indent, "ASSIGNMENT:");
 
     print_ast_node(asgmt->var_list, indent + 1);
-    INDENT(indent + 1);
-    printf("VALUE:\n");
+    INDENTED(indent + 1, "VALUE:");
     print_ast_node(asgmt->expr_list, indent + 2);
 }
 
 static void print_func_call(FuncCall* func_call, size_t indent) {
-    INDENT(indent);
-    printf("FUNCTION CALL:\n");
-    INDENT(indent + 1);
-    printf("NAME: %s\n", func_call->name);
+    INDENTED(indent, "FUNCTION CALL:");
+    INDENTED(indent + 1, "NAME: %s", func_call->name);
 
     if(func_call->prefix) {
-        INDENT(indent + 1);
-        printf("Prefix: ");
+        INDENTED(indent + 1, "PREFIX: ");
         print_ast_node(func_call->prefix, indent + 2);
     }
 
-    INDENT(indent + 1);
-    printf("ARGS:\n");
+    INDENTED(indent + 1, "ARGS:");
     for(ASTNode** arg = func_call->args; *arg != NULL; arg++) {
         print_ast_node(*arg, indent + 2);
     }
 }
 
-static void print_var_node(VarNode* var, size_t indent) {
-    INDENT(indent);
+static void print_func_expr(FuncExpr* func_expr, size_t indent) {
+    INDENTED(indent, "FUNCTION<%s>:", func_expr->scope ? func_expr->scope->name : "");
+    INDENTED(indent + 1, "NAME: %s", func_expr->name->name);
+    INDENTED(indent + 1, "BODY:");
+    print_ast_node(func_expr->body, indent + 2);
+}
 
-    printf("VAR");
-    if(var->is_local) {
-        printf("(LOCAL)");
+static void print_symbol(Symbol* symbol, size_t indent) {
+    if(symbol->scope) {
+
+        INDENTED(indent, "VAR<%s>: %s ", symbol->scope->name, symbol->name);
     }
-    printf(": %s\n", var->name);
+    INDENTED(indent, "VAR: %s ", symbol->name);
 }
 
 static void print_str_literal(StrLiteral* str, size_t indent) {
-    INDENT(indent);
-    printf("STRING: %s\n", str->str_val);
+    INDENTED(indent, "STRING: %s", str->str_val);
 }
 
 static const char* binary_op_str(BinaryOperator op) {

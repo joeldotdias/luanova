@@ -5,11 +5,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define INDENT(depth)                                                                    \
+#define INDENTED(depth, format, ...)                                                     \
     do {                                                                                 \
         for(size_t i = 0; i < (depth) * 2; i++) {                                        \
             printf(" ");                                                                 \
         }                                                                                \
+        printf(format "\n", ##__VA_ARGS__);                                              \
     } while(0)
 
 typedef enum {
@@ -45,7 +46,7 @@ typedef enum {
     ASTNODE_UNARY_EXPR,
 
     // variable stuff
-    ASTNODE_VAR,
+    ASTNODE_SYMBOL,
     ASTNODE_INDEXED_VAR,
     ASTNODE_FIELD_VAR,
 
@@ -88,6 +89,17 @@ typedef enum {
 } UnaryOperator;
 
 typedef struct ASTNode ASTNode;
+typedef struct Scope Scope;
+typedef struct Symbol Symbol;
+
+struct Scope {
+    ASTNode* function; // type FuncExpr
+    Scope* parent;     // NULL if belongs to main chunk
+    char* name;        // really stupid
+    Symbol** symbol_lookup;
+    size_t symbol_count, lookup_capacity;
+    bool must_be_closed; // if vars are in a closure, maybe move them to the heep
+};
 
 typedef struct {
     ASTNode** stmteez;
@@ -134,12 +146,13 @@ typedef struct {
 } ForGeneric;
 
 typedef struct {
-    ASTNode* name;
-    ASTNode* params;
+    Symbol* name;
+    Scope* scope;
+    Symbol** params; // type must be symbol
     ASTNode* body;
     bool is_method;
     bool is_local;
-} FuncDecl;
+} FuncExpr;
 
 typedef struct {
     char* name;
@@ -151,10 +164,17 @@ typedef struct {
     ASTNode* return_val;
 } ReturnStmt;
 
-typedef struct {
+struct Symbol {
     char* name;
+    Scope* scope;
     bool is_local;
-} VarNode;
+    enum {
+        SYM_LOCAL,
+        SYM_GLOBAL,
+        SYM_PARAM,
+        SYM_LABEL,
+    } symbol_kind;
+};
 
 typedef struct {
     ASTNode* prefix;
@@ -205,10 +225,10 @@ struct ASTNode {
         IfStmt if_stmt;
         ForNumeric for_numeric;
         ForGeneric for_generic;
-        FuncDecl func_decl;
+        FuncExpr func_decl;
         FuncCall func_call;
         ReturnStmt return_stmt;
-        VarNode var_node;
+        Symbol symbol;
         IndexedVar indexed_var;
         BinaryExpr binary_expr;
         UnaryExpr unary_expr;

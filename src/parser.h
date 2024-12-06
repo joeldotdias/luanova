@@ -8,9 +8,15 @@
     LOG_FATAL("EXPECTED %s | RECEIVED %s", expected, token_to_str(parser->curr_token))
 
 typedef struct {
+    Scope* curr_scope;
+    Scope* global;
+} ScopeTracker;
+
+typedef struct {
     Lexer* lexer;
     Token* curr_token;
     Token* peeked_token;
+    ScopeTracker* scope_tracker;
 } Parser;
 
 Parser* init_parser(Lexer* lexer);
