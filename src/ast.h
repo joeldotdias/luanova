@@ -238,6 +238,6 @@ struct ASTNode {
     };
 };
 
-void print_ast(ASTNode* root);
+void ast_dump(ASTNode* root);
 
 #endif

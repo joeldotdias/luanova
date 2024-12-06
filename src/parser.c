@@ -8,7 +8,7 @@
 #include "parser.h"
 #include "shared.h"
 
-// fail denotes at what token we stop
+// fail represents the token at which we stop processing the chunk
 static ASTNode* parse_chunk(Parser* parser, TokenKind fail);
 static ASTNode* parse_local_assignment(Parser* parser);
 static ASTNode* parse_local_function(Parser* parser);
@@ -59,28 +59,7 @@ Parser* init_parser(Lexer* lexer) {
 
 ASTNode* parse(Parser* parser) {
     ASTNode* chunk = parse_chunk(parser, TOKEN_EOF);
-    /* ASTNode* chunk = calloc(1, sizeof(ASTNode)); */
-    /* chunk->kind = ASTNODE_CHUNK; */
-    /* // remove hardcoded 5 */
-    /* chunk->chunk.stmteez = calloc(5, sizeof(ASTNode*)); */
-    /* chunk->chunk.stmt_count = 0; */
-    /**/
-    /* while(parser->curr_token->kind != TOKEN_EOF) { */
-    /*     if(parser->curr_token->kind == TOKEN_LOCAL) { */
-    /*         ASTNode* assgmt = parse_local_assignment(parser); */
-    /*         chunk->chunk.stmteez[chunk->chunk.stmt_count++] = assgmt; */
-    /*     } else if(parser->curr_token->kind == TOKEN_RETURN) { */
-    /*         ASTNode* ret_stmt = parse_return(parser); */
-    /*         chunk->chunk.stmteez[chunk->chunk.stmt_count++] = ret_stmt; */
-    /*     } else { */
-    /*         ASTNode* expr = parse_expr(parser); */
-    /*         chunk->chunk.stmteez[chunk->chunk.stmt_count++] = expr; */
-    /*     } */
-    /**/
-    /*     advance_parser(parser); */
-    /* } */
-
-    print_ast(chunk);
+    ast_dump(chunk);
 
     return chunk;
 }
@@ -88,25 +67,7 @@ ASTNode* parse(Parser* parser) {
 static ASTNode* parse_chunk(Parser* parser, TokenKind fail) {
     ASTNode* node = calloc(1, sizeof(ASTNode));
     node->kind = ASTNODE_CHUNK;
-    // remove hardcoded 5
-    /* node->chunk.stmteez = calloc(5, sizeof(ASTNode*)); */
-    /* node->chunk.stmt_count = 0; */
-    /**/
-    /* while(parser->curr_token->kind != TOKEN_EOF && parser->curr_token->kind != fail) {
-     */
-    /*     if(parser->curr_token->kind == TOKEN_LOCAL) { */
-    /*         ASTNode* assgmt = parse_local_assignment(parser); */
-    /*         node->chunk.stmteez[node->chunk.stmt_count++] = assgmt; */
-    /*     } else if(parser->curr_token->kind == TOKEN_RETURN) { */
-    /*         ASTNode* ret_stmt = parse_return(parser); */
-    /*         node->chunk.stmteez[node->chunk.stmt_count++] = ret_stmt; */
-    /*     } else { */
-    /*         ASTNode* expr = parse_expr(parser); */
-    /*         node->chunk.stmteez[node->chunk.stmt_count++] = expr; */
-    /*     } */
-    /**/
-    /*     advance_parser(parser); */
-    /* } */
+
     Chunk* chunk = calloc(1, sizeof(Chunk));
     chunk->stmteez = calloc(10, sizeof(ASTNode*));
     chunk->stmt_count = 0;
@@ -125,6 +86,7 @@ static ASTNode* parse_chunk(Parser* parser, TokenKind fail) {
         advance_parser(parser);
     }
     node->chunk = *chunk;
+
     return node;
 }
 
@@ -165,14 +127,6 @@ static ASTNode* parse_local_assignment(Parser* parser) {
     return node;
 }
 
-/**/
-/* local function localFunc() */
-/* 	local f = "World" */
-/* 	print(f) */
-/* end */
-/**/
-/* localFunc() */
-
 static ASTNode* parse_local_function(Parser* parser) {
     ASTNode* node = make_node(ASTNODE_FUNC_EXPR);
     FuncExpr* func = calloc(1, sizeof(FuncExpr));
@@ -194,19 +148,10 @@ static ASTNode* parse_local_function(Parser* parser) {
 
     ASTNode* chunk = parse_chunk(parser, TOKEN_END);
     func->body = chunk;
-    /* LOG_FATAL("Now we at curr: %s, peek: %s", token_to_str(parser->curr_token), */
-    /*           token_to_str(parser->peeked_token)); */
     advance_parser(parser);
-    /* LOG_FATAL("WELL Crossd that"); */
-    /* node->func_decl */
 
-    /* Symbol* name =  */
-    /* ASTNode* name */
     node->func_decl = *func;
-    /* LOG_INFO("In scope %s", parser->scope_tracker->curr_scope->name); */
     exit_scope(parser->scope_tracker);
-    /* LOG_FATAL("Finished function now in %s", parser->scope_tracker->curr_scope->name);
-     */
 
     return node;
 }
@@ -322,8 +267,8 @@ static void exit_scope(ScopeTracker* tracker) {
         tracker->curr_scope = scope_to_close->parent;
 
         // test these first
-        /* free(scope_to_close->symbol_lookup); */
-        /* free(scope_to_close); */
+        free(scope_to_close->symbol_lookup);
+        free(scope_to_close);
     }
 }
 
@@ -338,7 +283,6 @@ static void add_symbol_to_scope(Scope* scope, Symbol* symbol) {
         LOG_INFO("REALLOCED for SCOPE:<%s>", scope->name);
     }
     scope->symbol_lookup[scope->symbol_count++] = symbol;
-    /* scope->symbol_count += 1; */
 }
 
 static Symbol* look_for_symbol(Symbol** symbol_lookup, const char* name) {

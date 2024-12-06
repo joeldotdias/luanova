@@ -14,7 +14,7 @@ static void print_str_literal(StrLiteral* str, size_t indent);
 static const char* binary_op_str(BinaryOperator op);
 static const char* unary_op_str(UnaryOperator op);
 
-void print_ast(ASTNode* root) {
+void ast_dump(ASTNode* root) {
     LOG_INFO("=====AST=====");
     print_ast_node(root, 0);
 }
