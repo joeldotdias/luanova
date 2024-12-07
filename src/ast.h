@@ -112,15 +112,13 @@ struct Scope {
     ASTNode* function; // type FuncExpr
     Scope* parent;     // NULL if belongs to main chunk
     char* name;        // really stupid
-    Symbol** symbol_lookup;
-    size_t symbol_count, lookup_capacity;
+    SymbolList* symbol_lookup;
     bool must_be_closed; // if vars are in a closure, maybe move them to the heap
 };
 
 typedef struct {
-    ASTNode** stmteez;
-    size_t stmt_count;
-    ASTNode* last_stmt;
+    ASTNodeList* stmteez;
+    // ASTNode* last_stmt;
 } Chunk;
 
 typedef struct {
@@ -173,7 +171,6 @@ typedef struct {
 typedef struct {
     char* name;
     ASTNode* prefix;
-    // ASTNode** args;
     ASTNodeList* args;
 } FuncCall;
 

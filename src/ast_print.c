@@ -52,8 +52,8 @@ static void print_ast_node(ASTNode* node, size_t indent) {
 
 static void print_chunk(Chunk* chunk, size_t indent) {
     INDENTED(indent, "CHUNK:");
-    for(size_t i = 0; i < chunk->stmt_count; i++) {
-        print_ast_node(chunk->stmteez[i], indent + 1);
+    for(size_t i = 0; i < chunk->stmteez->count; i++) {
+        print_ast_node(chunk->stmteez->nodes[i], indent + 1);
     }
 }
 
