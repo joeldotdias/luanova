@@ -11,6 +11,8 @@
 // fail represents the token at which we stop processing the chunk
 static ASTNode* parse_chunk(Parser* parser, TokenKind fail);
 static ASTNode* parse_local_assignment(Parser* parser);
+static SymbolList* parse_assignment_lhs(Parser* parser);
+static ASTNodeList* parse_assignment_rhs(Parser* parser, size_t lhs_count);
 static ASTNode* parse_local_function(Parser* parser);
 static SymbolList* parse_func_params(Parser* parser);
 static ASTNode* parse_return(Parser* parser);
@@ -18,6 +20,7 @@ static ASTNode* parse_expr(Parser* parser);
 static ASTNode* parse_func_call(Parser* parser);
 static ASTNodeList* parse_func_args(Parser* parser);
 static ASTNode* parse_symbol(Parser* parser);
+static ASTNode* parse_str_literal(Parser* parser);
 
 static Scope* enter_scope(ScopeTracker* tracker, ASTNode* curr_function);
 static void exit_scope(ScopeTracker* tracker);
@@ -96,29 +99,17 @@ static ASTNode* parse_local_assignment(Parser* parser) {
 
     ASTNode* node = make_node(ASTNODE_LOCAL_VAR_DECLR);
     Assignment* asgmt = calloc(1, sizeof(Assignment));
-
-    Token* ident = consume_token(parser, TOKEN_IDENT);
-    if(!ident) {
-        FAILED_EXPECTATION("IDENT");
-    }
-
-    ASTNode* symbol = make_node(ASTNODE_SYMBOL);
-    symbol->symbol.name = strdup(ident->value);
-    symbol->symbol.is_local = true;
-    add_symbol_to_scope(parser->scope_tracker->curr_scope, &symbol->symbol);
-    asgmt->var_list = symbol;
+    asgmt->var_list = parse_assignment_lhs(parser);
 
     if(!consume_token(parser, TOKEN_ASSIGN)) {
         FAILED_EXPECTATION("ASSIGN");
     }
 
-    // TODO: string literal
-    Token* literal_tok = consume_token(parser, TOKEN_STR);
-    ASTNode* literal = calloc(1, sizeof(ASTNode));
-    literal->kind = ASTNODE_STR_LITERAL;
+    asgmt->expr_list = parse_assignment_rhs(parser, asgmt->var_list->count);
 
-    literal->str_literal.str_val = strdup(literal_tok->value);
-    asgmt->expr_list = literal;
+    if(asgmt->var_list->count < asgmt->expr_list->count) {
+        LOG_FATAL("More values on RHS than vars on LHS of assignment");
+    }
 
     node->assignment = *asgmt;
 
@@ -149,33 +140,14 @@ static ASTNode* parse_local_function(Parser* parser) {
         FAILED_EXPECTATION("RPAREN");
     }
 
-    /* LOG_FATAL("Parsed params now curr: %s", token_to_str(parser->curr_token)); */
-
     ASTNode* chunk = parse_chunk(parser, TOKEN_END);
     func->body = chunk;
     advance_parser(parser);
-
-    /* consume_token(parser, TOKEN_RPAREN); */
 
     node->func_decl = *func;
     exit_scope(parser->scope_tracker);
 
     return node;
-}
-
-static SymbolList* parse_func_params(Parser* parser) {
-    SymbolList* params = init_symbol_list();
-
-    while(parser->curr_token->kind != TOKEN_RPAREN) {
-        ASTNode* param = parse_symbol(parser);
-        add_to_symbol_list(params, &param->symbol);
-
-        if(parser->curr_token->kind == TOKEN_COMMA) {
-            advance_parser(parser);
-        }
-    }
-
-    return params;
 }
 
 static ASTNode* parse_return(Parser* parser) {
@@ -193,6 +165,8 @@ static ASTNode* parse_expr(Parser* parser) {
             // other shit
             node = parse_symbol(parser);
         }
+    } else if(parser->curr_token->kind == TOKEN_STR) {
+        node = parse_str_literal(parser);
     }
     return node;
 }
@@ -217,6 +191,34 @@ static ASTNode* parse_func_call(Parser* parser) {
     return node;
 }
 
+static ASTNode* parse_str_literal(Parser* parser) {
+    ASTNode* node = make_node(ASTNODE_STR_LITERAL);
+    StrLiteral* str = calloc(1, sizeof(StrLiteral));
+    Token* str_tok = consume_token(parser, TOKEN_STR);
+    if(!str_tok) {
+        FAILED_EXPECTATION("STR LITERAL");
+    }
+    str->str_val = strdup(str_tok->value);
+    node->str_literal = *str;
+
+    return node;
+}
+
+static SymbolList* parse_func_params(Parser* parser) {
+    SymbolList* params = init_symbol_list();
+
+    while(parser->curr_token->kind != TOKEN_RPAREN) {
+        ASTNode* param = parse_symbol(parser);
+        add_to_symbol_list(params, &param->symbol);
+
+        if(parser->curr_token->kind == TOKEN_COMMA) {
+            advance_parser(parser);
+        }
+    }
+
+    return params;
+}
+
 static ASTNodeList* parse_func_args(Parser* parser) {
     ASTNodeList* args = init_ast_node_list();
 
@@ -230,6 +232,48 @@ static ASTNodeList* parse_func_args(Parser* parser) {
     }
 
     return args;
+}
+
+static SymbolList* parse_assignment_lhs(Parser* parser) {
+    SymbolList* vars = init_symbol_list();
+
+    while(parser->curr_token->kind != TOKEN_ASSIGN) {
+        ASTNode* var = parse_symbol(parser);
+        add_to_symbol_list(vars, &var->symbol);
+
+        if(parser->curr_token->kind == TOKEN_COMMA) {
+            advance_parser(parser);
+        }
+    }
+
+    return vars;
+}
+
+static ASTNodeList* parse_assignment_rhs(Parser* parser, size_t lhs_count) {
+    ASTNodeList* exprs = init_ast_node_list();
+
+    for(size_t i = 0; i < lhs_count; i++) {
+        ASTNode* expr = parse_expr(parser);
+        if(!expr) {
+            LOG_FATAL("HUHH");
+        }
+        add_to_ast_node_list(exprs, expr);
+
+        if(parser->curr_token->kind == TOKEN_COMMA) {
+            advance_parser(parser);
+        }
+    }
+
+    /* while(parser->curr_token->kind != TOKEN_ASSIGN) {
+        ASTNode* expr = parse_expr(parser);
+        add_to_ast_node_list(exprs, expr);
+
+        if(parser->curr_token->kind == TOKEN_COMMA) {
+            advance_parser(parser);
+        }
+    } */
+
+    return exprs;
 }
 
 static void advance_parser(Parser* parser) {

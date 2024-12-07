@@ -1,4 +1,4 @@
-local str = "Luuaaa"
+local str, btr = "Luuaaa", "Buaaa"
 print(str)
 
 local function greet(abc, xyz)

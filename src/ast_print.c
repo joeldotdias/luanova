@@ -60,9 +60,11 @@ static void print_chunk(Chunk* chunk, size_t indent) {
 static void print_assignment(Assignment* asgmt, size_t indent) {
     INDENTED(indent, "ASSIGNMENT:");
 
-    print_ast_node(asgmt->var_list, indent + 1);
-    INDENTED(indent + 1, "VALUE:");
-    print_ast_node(asgmt->expr_list, indent + 2);
+    for(size_t i = 0; i < asgmt->var_list->count; i++) {
+        print_symbol(asgmt->var_list->symbols[i], indent + 1);
+        INDENTED(indent + 1, "VALUE:");
+        print_ast_node(asgmt->expr_list->nodes[i], indent + 2);
+    }
 }
 
 static void print_func_call(FuncCall* func_call, size_t indent) {
@@ -80,9 +82,6 @@ static void print_func_call(FuncCall* func_call, size_t indent) {
             print_ast_node(func_call->args->nodes[i], indent + 2);
         }
     }
-    /* for(ASTNode** arg = func_call->args; *arg != NULL; arg++) { */
-    /*     print_ast_node(*arg, indent + 2); */
-    /* } */
 }
 
 static void print_func_expr(FuncExpr* func_expr, size_t indent) {

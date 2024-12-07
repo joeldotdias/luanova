@@ -122,8 +122,10 @@ typedef struct {
 } Chunk;
 
 typedef struct {
-    struct ASTNode* var_list;
-    struct ASTNode* expr_list;
+    struct ASTNode* old_var_list;
+    SymbolList* var_list;
+    ASTNodeList* expr_list;
+    struct ASTNode* old_expr_list;
 } Assignment;
 
 typedef struct {
