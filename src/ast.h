@@ -92,13 +92,29 @@ typedef struct ASTNode ASTNode;
 typedef struct Scope Scope;
 typedef struct Symbol Symbol;
 
+typedef struct {
+    ASTNode** nodes;
+    size_t count, capacity;
+} ASTNodeList;
+
+typedef struct {
+    Symbol** symbols;
+    size_t count, capacity;
+} SymbolList;
+
+SymbolList* init_symbol_list();
+void add_to_symbol_list(SymbolList* list, Symbol* symbol);
+void print_symbol_list(const SymbolList* list);
+ASTNodeList* init_ast_node_list();
+void add_to_ast_node_list(ASTNodeList* list, ASTNode* node);
+
 struct Scope {
     ASTNode* function; // type FuncExpr
     Scope* parent;     // NULL if belongs to main chunk
     char* name;        // really stupid
     Symbol** symbol_lookup;
     size_t symbol_count, lookup_capacity;
-    bool must_be_closed; // if vars are in a closure, maybe move them to the heep
+    bool must_be_closed; // if vars are in a closure, maybe move them to the heap
 };
 
 typedef struct {
@@ -148,7 +164,7 @@ typedef struct {
 typedef struct {
     Symbol* name;
     Scope* scope;
-    Symbol** params; // type must be symbol
+    SymbolList* params;
     ASTNode* body;
     bool is_method;
     bool is_local;
@@ -157,7 +173,8 @@ typedef struct {
 typedef struct {
     char* name;
     ASTNode* prefix;
-    ASTNode** args;
+    // ASTNode** args;
+    ASTNodeList* args;
 } FuncCall;
 
 typedef struct {
@@ -239,5 +256,6 @@ struct ASTNode {
 };
 
 void ast_dump(ASTNode* root);
+char* node_to_str(ASTNode* node);
 
 #endif

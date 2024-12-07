@@ -4,7 +4,7 @@ SOURCES = $(shell find src -name "*.c")
 TARGET = luanoia
 
 $(TARGET): $(SOURCES)
-	@$(COMPILER) $(CFLAGS) $(SOURCES) -o $(TARGET)
+	@$(COMPILER) $(SOURCES) -o $(TARGET)
 
 anz:
 	@clang $(CFLAGS) --analyze -Xclang -analyzer-output=text $(SOURCES)

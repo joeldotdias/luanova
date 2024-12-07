@@ -1,7 +1,7 @@
-local str = "Hello"
+local str = "Luuaaa"
 print(str)
 
-local function greet()
+local function greet(abc, xyz)
 	local greeting = "Hello, World!"
 	print(greeting)
 end

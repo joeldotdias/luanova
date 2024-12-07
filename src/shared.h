@@ -10,7 +10,7 @@
         exit(EXIT_FAILURE);                                                              \
     } while(0)
 
-#define LOG_INFO(fmt, ...) printf("\033[32m" fmt "\033[0m\n", ##__VA_ARGS__);
+#define INFO(fmt, ...) printf("\033[32m" fmt "\033[0m\n", ##__VA_ARGS__);
 
 #define UNIMPLEMENTED()                                                                  \
     do {                                                                                 \

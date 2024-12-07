@@ -373,7 +373,7 @@ static void eat_whitespace(Lexer* lexer) {
 }
 
 char* token_to_str(Token* token) {
-    char buffer[256] = {0};
+    char buffer[512] = {0};
 
     switch(token->kind) {
         case TOKEN_IDENT:
