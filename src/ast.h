@@ -32,6 +32,7 @@ typedef enum {
     ASTNODE_LOCAL_VAR_DECLR,
     ASTNODE_RETURN_STMT,
     ASTNODE_BREAK_STMT,
+    ASTNODE_FUNC_STMT,
 
     // expressions
     ASTNODE_NIL_LITERAL,
@@ -49,11 +50,6 @@ typedef enum {
     ASTNODE_SYMBOL,
     ASTNODE_INDEXED_VAR,
     ASTNODE_FIELD_VAR,
-
-    // function stuff
-    ASTNODE_FUNC_NAME,
-    ASTNODE_PARAMS,
-    ASTNODE_ARGS,
 
     // table related
     ASTNODE_TABLE_FIELD,
@@ -175,6 +171,12 @@ typedef struct {
 } FuncExpr;
 
 typedef struct {
+    Symbol* name;
+    ASTNodeList* Selectors;
+    FuncExpr* func_expr;
+} FuncStmt;
+
+typedef struct {
     char* name;
     ASTNode* prefix;
     ASTNodeList* args;
@@ -245,7 +247,8 @@ struct ASTNode {
         IfStmt if_stmt;
         ForNumeric for_numeric;
         ForGeneric for_generic;
-        FuncExpr func_decl;
+        FuncStmt func_stmt;
+        FuncExpr func_expr;
         FuncCall func_call;
         ReturnStmt return_stmt;
         Symbol symbol;

@@ -4,9 +4,15 @@
 #include "ast.h"
 #include "shared.h"
 
-/* static void print_ast_node(ASTNode* node, size_t indent); */
+#define COLOR_RESET "\x1b[0m"
+#define COLOR_KEY "\x1b[1;36m"     // Cyan for keys like "CHUNK", "ASSIGNMENT"
+#define COLOR_SYMBOL "\x1b[1;33m"  // Yellow for symbols
+#define COLOR_LITERAL "\x1b[1;31m" // Red for literals
+#define COLOR_NAME "\x1b[1;34m"    // Blue for names
+
 static void print_chunk(Chunk* chunk, size_t indent);
 static void print_assignment(Assignment* asgmt, size_t indent);
+static void print_func_stmt(FuncStmt* func_stmt, size_t indent);
 static void print_func_expr(FuncExpr* func_expr, size_t indent);
 static void print_func_call(FuncCall* func_call, size_t indent);
 static void print_symbol(Symbol* var, size_t indent);
@@ -42,7 +48,10 @@ void print_ast_node(ASTNode* node, size_t indent) {
             print_str_literal(&node->str_literal, indent);
             break;
         case ASTNODE_FUNC_EXPR:
-            print_func_expr(&node->func_decl, indent);
+            print_func_expr(&node->func_expr, indent);
+            break;
+        case ASTNODE_FUNC_STMT:
+            print_func_stmt(&node->func_stmt, indent);
             break;
         default:
             INFO("RECV %s", node_to_str(node));
@@ -51,33 +60,33 @@ void print_ast_node(ASTNode* node, size_t indent) {
 }
 
 static void print_chunk(Chunk* chunk, size_t indent) {
-    INDENTED(indent, "CHUNK:");
+    INDENTED(indent, COLOR_KEY "CHUNK:" COLOR_RESET);
     for(size_t i = 0; i < chunk->stmteez->count; i++) {
         print_ast_node(chunk->stmteez->nodes[i], indent + 1);
     }
 }
 
 static void print_assignment(Assignment* asgmt, size_t indent) {
-    INDENTED(indent, "ASSIGNMENT:");
+    INDENTED(indent, COLOR_KEY "ASSIGNMENT:" COLOR_RESET);
 
     for(size_t i = 0; i < asgmt->var_list->count; i++) {
         print_symbol(asgmt->var_list->symbols[i], indent + 1);
-        INDENTED(indent + 1, "VALUE:");
+        INDENTED(indent + 1, COLOR_KEY "VALUE:" COLOR_RESET);
         print_ast_node(asgmt->expr_list->nodes[i], indent + 2);
     }
 }
 
 static void print_func_call(FuncCall* func_call, size_t indent) {
-    INDENTED(indent, "FUNCTION CALL:");
-    INDENTED(indent + 1, "NAME: %s", func_call->name);
+    INDENTED(indent, COLOR_KEY "FUNCTION CALL:" COLOR_RESET);
+    INDENTED(indent + 1, COLOR_KEY "NAME: " COLOR_NAME "%s" COLOR_RESET, func_call->name);
 
     if(func_call->prefix) {
-        INDENTED(indent + 1, "PREFIX: ");
+        INDENTED(indent + 1, COLOR_KEY "PREFIX:" COLOR_RESET);
         print_ast_node(func_call->prefix, indent + 2);
     }
 
     if(func_call->args) {
-        INDENTED(indent + 1, "ARGS:");
+        INDENTED(indent + 1, COLOR_KEY "ARGS:" COLOR_RESET);
         for(size_t i = 0; i < func_call->args->count; i++) {
             print_ast_node(func_call->args->nodes[i], indent + 2);
         }
@@ -85,28 +94,38 @@ static void print_func_call(FuncCall* func_call, size_t indent) {
 }
 
 static void print_func_expr(FuncExpr* func_expr, size_t indent) {
-    INDENTED(indent, "FUNCTION<%s>:", func_expr->scope ? func_expr->scope->name : "");
-    INDENTED(indent + 1, "NAME: %s", func_expr->name->name);
+    INDENTED(indent, COLOR_KEY "FUNC EXPR:");
     if(func_expr->params) {
-        INDENTED(indent + 1, "PARAMS:");
+        INDENTED(indent + 1, COLOR_KEY "PARAMS:" COLOR_RESET);
         for(size_t i = 0; i < func_expr->params->count; i++) {
             print_symbol(func_expr->params->symbols[i], indent + 2);
         }
     }
-    INDENTED(indent + 1, "BODY:");
+    INDENTED(indent + 1, COLOR_KEY "BODY:" COLOR_RESET);
     print_ast_node(func_expr->body, indent + 2);
+}
+
+static void print_func_stmt(FuncStmt* func_stmt, size_t indent) {
+    INDENTED(indent, COLOR_KEY "FUNCTION<%s>:" COLOR_RESET,
+             func_stmt->func_expr->scope ? func_stmt->func_expr->scope->name : "");
+
+    INDENTED(indent + 1, COLOR_KEY "NAME: " COLOR_NAME "%s" COLOR_RESET,
+             func_stmt->name->name);
+
+    print_func_expr(func_stmt->func_expr, indent + 1);
 }
 
 static void print_symbol(Symbol* symbol, size_t indent) {
     if(symbol->scope) {
-        INDENTED(indent, "SYMBOL<%s>: %s ", symbol->scope->name, symbol->name);
+        INDENTED(indent, COLOR_SYMBOL "SYMBOL<%s>: %s" COLOR_RESET, symbol->scope->name,
+                 symbol->name);
     } else {
-        INDENTED(indent, "SYMBOL: %s ", symbol->name);
+        INDENTED(indent, COLOR_SYMBOL "SYMBOL:%s" COLOR_RESET, symbol->name);
     }
 }
 
 static void print_str_literal(StrLiteral* str, size_t indent) {
-    INDENTED(indent, "STRING: %s", str->str_val);
+    INDENTED(indent, COLOR_KEY "STRING: " COLOR_LITERAL "%s" COLOR_RESET, str->str_val);
 }
 
 static const char* binary_op_str(BinaryOperator op) {
@@ -193,6 +212,8 @@ char* node_to_str(ASTNode* node) {
             return "ASTNODE_RETURN_STMT";
         case ASTNODE_BREAK_STMT:
             return "ASTNODE_BREAK_STMT";
+        case ASTNODE_FUNC_STMT:
+            return "ASTNODE_FUNC_STMT";
 
         // expressions
         case ASTNODE_NIL_LITERAL:
@@ -223,14 +244,6 @@ char* node_to_str(ASTNode* node) {
             return "ASTNODE_INDEXED_VAR";
         case ASTNODE_FIELD_VAR:
             return "ASTNODE_FIELD_VAR";
-
-        // function stuff
-        case ASTNODE_FUNC_NAME:
-            return "ASTNODE_FUNC_NAME";
-        case ASTNODE_PARAMS:
-            return "ASTNODE_PARAMS";
-        case ASTNODE_ARGS:
-            return "ASTNODE_ARGS";
 
         // table related
         case ASTNODE_TABLE_FIELD:

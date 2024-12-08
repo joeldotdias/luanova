@@ -13,7 +13,8 @@ static ASTNode* parse_chunk(Parser* parser, TokenKind fail);
 static ASTNode* parse_local_assignment(Parser* parser);
 static SymbolList* parse_assignment_lhs(Parser* parser);
 static ASTNodeList* parse_assignment_rhs(Parser* parser, size_t lhs_count);
-static ASTNode* parse_local_function(Parser* parser);
+static ASTNode* parse_function_stmt(Parser* parser, bool is_local);
+static FuncExpr* parse_func_expr(Parser* parser);
 static SymbolList* parse_func_params(Parser* parser);
 static ASTNode* parse_return(Parser* parser);
 static ASTNode* parse_expr(Parser* parser);
@@ -94,7 +95,7 @@ static ASTNode* parse_local_assignment(Parser* parser) {
     }
 
     if(consume_token(parser, TOKEN_FUNCTION)) {
-        return parse_local_function(parser);
+        return parse_function_stmt(parser, true);
     }
 
     ASTNode* node = make_node(ASTNODE_LOCAL_VAR_DECLR);
@@ -116,19 +117,36 @@ static ASTNode* parse_local_assignment(Parser* parser) {
     return node;
 }
 
-static ASTNode* parse_local_function(Parser* parser) {
-    ASTNode* node = make_node(ASTNODE_FUNC_EXPR);
-    FuncExpr* func = calloc(1, sizeof(FuncExpr));
-    Symbol* func_name = &parse_symbol(parser, true)->symbol;
-    func->name = func_name;
-    func->scope = func_name->scope; // change this stupidity
-    func->params = NULL;
+static ASTNode* parse_function_stmt(Parser* parser, bool is_local) {
+    ASTNode* node = make_node(ASTNODE_FUNC_STMT);
+    FuncStmt* func_stmt = calloc(1, sizeof(FuncStmt));
+    Symbol* func_name = &parse_symbol(parser, is_local)->symbol;
+    func_stmt->name = func_name;
+    if(is_local) {
+        func_stmt->name->scope = func_name->scope;
+    }
 
     add_symbol_to_scope(parser->scope_tracker->curr_scope, func_name);
     Scope* curr_scope = enter_scope(parser->scope_tracker, node);
     curr_scope->name = malloc(strlen("FUNC_") + strlen(func_name->name) + 1);
     sprintf(curr_scope->name, "FUNC_%s", func_name->name);
-    INFO("Entering scope %s\n", curr_scope->name);
+
+    FuncExpr* func_expr = parse_func_expr(parser);
+    func_expr->name = func_name;
+    func_stmt->func_expr = func_expr;
+    if(is_local) {
+        func_expr->scope = func_name->scope;
+    }
+
+    node->func_stmt = *func_stmt;
+    leave_scope(parser->scope_tracker);
+
+    return node;
+}
+
+static FuncExpr* parse_func_expr(Parser* parser) {
+    FuncExpr* func = calloc(1, sizeof(FuncExpr));
+
     if(!consume_token(parser, TOKEN_LPAREN)) {
         FAILED_EXPECTATION("LPAREN");
     }
@@ -144,13 +162,11 @@ static ASTNode* parse_local_function(Parser* parser) {
     func->body = chunk;
     advance_parser(parser);
 
-    node->func_decl = *func;
-    leave_scope(parser->scope_tracker);
-
-    return node;
+    return func;
 }
 
 static ASTNode* parse_return(Parser* parser) {
+    UNIMPLEMENTED();
     ASTNode* node = make_node(ASTNODE_RETURN_STMT);
     return node;
 }
@@ -167,6 +183,11 @@ static ASTNode* parse_expr(Parser* parser) {
         }
     } else if(parser->curr_token->kind == TOKEN_STR) {
         node = parse_str_literal(parser);
+    } else if(consume_token(parser, TOKEN_FUNCTION)) {
+        node = make_node(ASTNODE_FUNC_EXPR);
+        FuncExpr* func_expr = parse_func_expr(parser);
+        node->func_expr = *func_expr;
+        print_ast_node(node, 0);
     }
     return node;
 }
@@ -230,9 +251,6 @@ static ASTNodeList* parse_func_args(Parser* parser) {
             advance_parser(parser);
         }
     }
-    INFO("FOR SCOPE %s", parser->scope_tracker->curr_scope->name);
-    print_ast_node_list(args);
-    printf("\n");
 
     return args;
 }

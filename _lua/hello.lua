@@ -1,13 +1,18 @@
 local str, btr = "Luuaaa", "Buaaa"
 print(str)
 
+local lemon = function(uvw)
+	print("Hello")
+end
+
 local function greet(abc, xyz)
 	local greeting = "Hello, World!"
-	local function team()
+	local function cream()
 		local ben = "ten"
-		print(greeting, ben, btr)
+		print(greeting, btr, ben)
 	end
 	print(greeting, str)
 end
 
 greet()
+lemon()
