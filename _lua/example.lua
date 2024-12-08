@@ -15,6 +15,12 @@ function check_number(num)
 	end
 end
 
+local M = {
+	mb = function()
+		return "hello"
+	end,
+}
+
 M.mb()
 
 print("Sum of a and b is: " .. add(a, b))

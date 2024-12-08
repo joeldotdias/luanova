@@ -19,7 +19,7 @@ static ASTNode* parse_return(Parser* parser);
 static ASTNode* parse_expr(Parser* parser);
 static ASTNode* parse_func_call(Parser* parser);
 static ASTNodeList* parse_func_args(Parser* parser);
-static ASTNode* parse_symbol(Parser* parser);
+static ASTNode* parse_symbol(Parser* parser, bool is_local);
 static ASTNode* parse_str_literal(Parser* parser);
 
 static Scope* enter_scope(ScopeTracker* tracker, ASTNode* curr_function);
@@ -119,8 +119,7 @@ static ASTNode* parse_local_assignment(Parser* parser) {
 static ASTNode* parse_local_function(Parser* parser) {
     ASTNode* node = make_node(ASTNODE_FUNC_EXPR);
     FuncExpr* func = calloc(1, sizeof(FuncExpr));
-    Symbol* func_name = &parse_symbol(parser)->symbol;
-    func_name->scope = parser->scope_tracker->curr_scope;
+    Symbol* func_name = &parse_symbol(parser, true)->symbol;
     func->name = func_name;
     func->scope = func_name->scope; // change this stupidity
     func->params = NULL;
@@ -163,7 +162,7 @@ static ASTNode* parse_expr(Parser* parser) {
             node = parse_func_call(parser);
         } else {
             // other shit
-            node = parse_symbol(parser);
+            node = parse_symbol(parser, false);
         }
     } else if(parser->curr_token->kind == TOKEN_STR) {
         node = parse_str_literal(parser);
@@ -208,7 +207,7 @@ static SymbolList* parse_func_params(Parser* parser) {
     SymbolList* params = init_symbol_list();
 
     while(parser->curr_token->kind != TOKEN_RPAREN) {
-        ASTNode* param = parse_symbol(parser);
+        ASTNode* param = parse_symbol(parser, true);
         add_to_symbol_list(params, &param->symbol);
 
         if(parser->curr_token->kind == TOKEN_COMMA) {
@@ -238,8 +237,11 @@ static SymbolList* parse_assignment_lhs(Parser* parser) {
     SymbolList* vars = init_symbol_list();
 
     while(parser->curr_token->kind != TOKEN_ASSIGN) {
-        ASTNode* var = parse_symbol(parser);
-        add_to_symbol_list(vars, &var->symbol);
+        ASTNode* var = parse_symbol(parser, true);
+        Symbol* var_symbol = &var->symbol;
+        var_symbol->scope = parser->scope_tracker->curr_scope;
+        add_to_symbol_list(vars, var_symbol);
+        add_symbol_to_scope(parser->scope_tracker->curr_scope, var_symbol);
 
         if(parser->curr_token->kind == TOKEN_COMMA) {
             advance_parser(parser);
@@ -264,15 +266,6 @@ static ASTNodeList* parse_assignment_rhs(Parser* parser, size_t lhs_count) {
         }
     }
 
-    /* while(parser->curr_token->kind != TOKEN_ASSIGN) {
-        ASTNode* expr = parse_expr(parser);
-        add_to_ast_node_list(exprs, expr);
-
-        if(parser->curr_token->kind == TOKEN_COMMA) {
-            advance_parser(parser);
-        }
-    } */
-
     return exprs;
 }
 
@@ -283,18 +276,27 @@ static void advance_parser(Parser* parser) {
     parser->peeked_token = next_token(parser->lexer);
 }
 
-static ASTNode* parse_symbol(Parser* parser) {
+static ASTNode* parse_symbol(Parser* parser, bool is_local) {
     Token* ident = consume_token(parser, TOKEN_IDENT);
     if(!ident) {
         FAILED_EXPECTATION("IDENT");
     }
 
     ASTNode* node = make_node(ASTNODE_SYMBOL);
-    Symbol* symbol = calloc(1, sizeof(Symbol));
-    symbol->name = strdup(ident->value);
-    // TODO: Change scope resolution
-    symbol->scope = parser->scope_tracker->curr_scope;
-    node->symbol = *symbol;
+
+    if(is_local) {
+        Symbol* symbol = calloc(1, sizeof(Symbol));
+        symbol->name = strdup(ident->value);
+        symbol->scope = parser->scope_tracker->curr_scope;
+        node->symbol = *symbol;
+    } else {
+        Symbol* resolved_symbol =
+            resolve_symbol(parser->scope_tracker->curr_scope, ident->value);
+        if(!resolved_symbol) {
+            LOG_FATAL("Couldn't find symbol");
+        }
+        node->symbol = *resolved_symbol;
+    }
 
     return node;
 }
@@ -325,6 +327,7 @@ static void exit_scope(ScopeTracker* tracker) {
             // TODO: implement closing values
         }
 
+        print_symbol_list(tracker->curr_scope->symbol_lookup);
         tracker->curr_scope = scope_to_close->parent;
 
         // test these first
