@@ -4,7 +4,7 @@
 #include "ast.h"
 #include "shared.h"
 
-static void print_ast_node(ASTNode* node, size_t indent);
+/* static void print_ast_node(ASTNode* node, size_t indent); */
 static void print_chunk(Chunk* chunk, size_t indent);
 static void print_assignment(Assignment* asgmt, size_t indent);
 static void print_func_expr(FuncExpr* func_expr, size_t indent);
@@ -19,7 +19,7 @@ void ast_dump(ASTNode* root) {
     print_ast_node(root, 0);
 }
 
-static void print_ast_node(ASTNode* node, size_t indent) {
+void print_ast_node(ASTNode* node, size_t indent) {
     if(!node) {
         return;
     }

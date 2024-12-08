@@ -83,3 +83,9 @@ void add_to_ast_node_list(ASTNodeList* list, ASTNode* node) {
     list->nodes[list->count] = node;
     list->count++;
 }
+
+void print_ast_node_list(const ASTNodeList* list) {
+    for(size_t i = 0; i < list->count; i++) {
+        print_ast_node(list->nodes[i], 0);
+    }
+}

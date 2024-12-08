@@ -102,11 +102,15 @@ typedef struct {
     size_t count, capacity;
 } SymbolList;
 
+void ast_dump(ASTNode* root);
 SymbolList* init_symbol_list();
 void add_to_symbol_list(SymbolList* list, Symbol* symbol);
 void print_symbol_list(const SymbolList* list);
 ASTNodeList* init_ast_node_list();
 void add_to_ast_node_list(ASTNodeList* list, ASTNode* node);
+void print_ast_node_list(const ASTNodeList* list);
+void print_ast_node(ASTNode* node, size_t indent);
+char* node_to_str(ASTNode* node);
 
 struct Scope {
     ASTNode* function; // type FuncExpr
@@ -253,8 +257,5 @@ struct ASTNode {
         BoolLiteral bool_literal;
     };
 };
-
-void ast_dump(ASTNode* root);
-char* node_to_str(ASTNode* node);
 
 #endif

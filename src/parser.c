@@ -19,11 +19,11 @@ static ASTNode* parse_return(Parser* parser);
 static ASTNode* parse_expr(Parser* parser);
 static ASTNode* parse_func_call(Parser* parser);
 static ASTNodeList* parse_func_args(Parser* parser);
-static ASTNode* parse_symbol(Parser* parser, bool is_local);
+static ASTNode* parse_symbol(Parser* parser, bool is_confined_to_curr_scope);
 static ASTNode* parse_str_literal(Parser* parser);
 
 static Scope* enter_scope(ScopeTracker* tracker, ASTNode* curr_function);
-static void exit_scope(ScopeTracker* tracker);
+static void leave_scope(ScopeTracker* tracker);
 static Scope* create_scope(Scope* parent, ASTNode* curr_function);
 static void add_symbol_to_scope(Scope* scope, Symbol* symbol);
 static Symbol* resolve_symbol(Scope* curr_scope, const char* name);
@@ -128,15 +128,16 @@ static ASTNode* parse_local_function(Parser* parser) {
     Scope* curr_scope = enter_scope(parser->scope_tracker, node);
     curr_scope->name = malloc(strlen("FUNC_") + strlen(func_name->name) + 1);
     sprintf(curr_scope->name, "FUNC_%s", func_name->name);
+    INFO("Entering scope %s\n", curr_scope->name);
     if(!consume_token(parser, TOKEN_LPAREN)) {
         FAILED_EXPECTATION("LPAREN");
     }
 
     if(!consume_token(parser, TOKEN_RPAREN)) {
         func->params = parse_func_params(parser);
-    }
-    if(!consume_token(parser, TOKEN_RPAREN)) {
-        FAILED_EXPECTATION("RPAREN");
+        if(!consume_token(parser, TOKEN_RPAREN)) {
+            FAILED_EXPECTATION("RPAREN");
+        }
     }
 
     ASTNode* chunk = parse_chunk(parser, TOKEN_END);
@@ -144,7 +145,7 @@ static ASTNode* parse_local_function(Parser* parser) {
     advance_parser(parser);
 
     node->func_decl = *func;
-    exit_scope(parser->scope_tracker);
+    leave_scope(parser->scope_tracker);
 
     return node;
 }
@@ -229,6 +230,9 @@ static ASTNodeList* parse_func_args(Parser* parser) {
             advance_parser(parser);
         }
     }
+    INFO("FOR SCOPE %s", parser->scope_tracker->curr_scope->name);
+    print_ast_node_list(args);
+    printf("\n");
 
     return args;
 }
@@ -276,7 +280,7 @@ static void advance_parser(Parser* parser) {
     parser->peeked_token = next_token(parser->lexer);
 }
 
-static ASTNode* parse_symbol(Parser* parser, bool is_local) {
+static ASTNode* parse_symbol(Parser* parser, bool is_confined_to_curr_scope) {
     Token* ident = consume_token(parser, TOKEN_IDENT);
     if(!ident) {
         FAILED_EXPECTATION("IDENT");
@@ -284,7 +288,7 @@ static ASTNode* parse_symbol(Parser* parser, bool is_local) {
 
     ASTNode* node = make_node(ASTNODE_SYMBOL);
 
-    if(is_local) {
+    if(is_confined_to_curr_scope) {
         Symbol* symbol = calloc(1, sizeof(Symbol));
         symbol->name = strdup(ident->value);
         symbol->scope = parser->scope_tracker->curr_scope;
@@ -319,7 +323,7 @@ static Scope* enter_scope(ScopeTracker* tracker, ASTNode* curr_func) {
     return new_scope;
 }
 
-static void exit_scope(ScopeTracker* tracker) {
+static void leave_scope(ScopeTracker* tracker) {
     if(tracker->curr_scope) {
         Scope* scope_to_close = tracker->curr_scope;
 
@@ -327,7 +331,6 @@ static void exit_scope(ScopeTracker* tracker) {
             // TODO: implement closing values
         }
 
-        print_symbol_list(tracker->curr_scope->symbol_lookup);
         tracker->curr_scope = scope_to_close->parent;
 
         // test these first
@@ -342,7 +345,7 @@ static void add_symbol_to_scope(Scope* scope, Symbol* symbol) {
 
 static Symbol* look_for_symbol(SymbolList* symbol_lookup, const char* name) {
     for(size_t i = 0; i < symbol_lookup->count; i++) {
-        if(strcmp(symbol_lookup->symbols[i]->name, name)) {
+        if(strcmp(symbol_lookup->symbols[i]->name, name) == 0) {
             return symbol_lookup->symbols[i];
         }
     }
