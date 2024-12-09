@@ -2,7 +2,8 @@ local str, btr = "Luuaaa", "Buaaa"
 print(str)
 
 local lemon = function(uvw)
-	print("Hello")
+	print("Hello\"\n'")
+	print("\nName:\tJohn")
 end
 
 local function greet(abc, xyz)

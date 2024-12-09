@@ -1,14 +1,15 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "ast.h"
 #include "shared.h"
 
 #define COLOR_RESET "\x1b[0m"
-#define COLOR_KEY "\x1b[1;36m"     // Cyan for keys like "CHUNK", "ASSIGNMENT"
-#define COLOR_SYMBOL "\x1b[1;33m"  // Yellow for symbols
-#define COLOR_LITERAL "\x1b[1;31m" // Red for literals
-#define COLOR_NAME "\x1b[1;34m"    // Blue for names
+#define COLOR_KEY "\x1b[1;36m"
+#define COLOR_SYMBOL "\x1b[1;33m"
+#define COLOR_LITERAL "\x1b[1;31m"
+#define COLOR_NAME "\x1b[1;34m"
 
 static void print_chunk(Chunk* chunk, size_t indent);
 static void print_assignment(Assignment* asgmt, size_t indent);
@@ -19,6 +20,13 @@ static void print_symbol(Symbol* var, size_t indent);
 static void print_str_literal(StrLiteral* str, size_t indent);
 static const char* binary_op_str(BinaryOperator op);
 static const char* unary_op_str(UnaryOperator op);
+
+// helpers to display strings with escape sequences
+// these don't change the actual representation of the parsed string
+// they only produce a raw escaped string by escaping the escapes
+// so as to not mess up the indenting while dipslaying
+static char* escaped_str_to_display(const char* str);
+static size_t find_escaped_len(const char* str);
 
 void ast_dump(ASTNode* root) {
     INFO("=====AST=====");
@@ -125,7 +133,9 @@ static void print_symbol(Symbol* symbol, size_t indent) {
 }
 
 static void print_str_literal(StrLiteral* str, size_t indent) {
-    INDENTED(indent, COLOR_KEY "STRING: " COLOR_LITERAL "%s" COLOR_RESET, str->str_val);
+    char* escaped_str = escaped_str_to_display(str->str_val);
+    INDENTED(indent, COLOR_KEY "STRING: " COLOR_LITERAL "%s" COLOR_RESET, escaped_str);
+    free(escaped_str);
 }
 
 static const char* binary_op_str(BinaryOperator op) {
@@ -176,6 +186,63 @@ static const char* unary_op_str(UnaryOperator op) {
         default:
             return "UNKNOWN_OP";
     }
+}
+
+static char* escaped_str_to_display(const char* str) {
+    size_t len = strlen(str);
+    size_t extra_chars = find_escaped_len(str);
+
+    char* escaped = malloc(len + extra_chars + 1);
+    char* display_str = escaped;
+
+    while(*str) {
+        switch(*str) {
+            case '\n':
+                *display_str++ = '\\';
+                *display_str++ = 'n';
+                break;
+            case '\r':
+                *display_str++ = '\\';
+                *display_str++ = 'r';
+                break;
+            case '\t':
+                *display_str++ = '\\';
+                *display_str++ = 't';
+                break;
+            case '\\':
+                *display_str++ = '\\';
+                *display_str++ = '\\';
+                break;
+            case '"':
+                *display_str++ = '\\';
+                *display_str++ = '"';
+                break;
+            default:
+                *display_str++ = *str;
+        }
+        str++;
+    }
+    *display_str = '\0';
+
+    return escaped;
+}
+
+static size_t find_escaped_len(const char* str) {
+    size_t extra_chars = 0;
+    while(*str) {
+        switch(*str) {
+            case '\n':
+            case '\r':
+            case '\t':
+            case '\\':
+            case '"':
+                extra_chars++;
+                break;
+        }
+        str++;
+    }
+
+    return extra_chars;
 }
 
 char* node_to_str(ASTNode* node) {

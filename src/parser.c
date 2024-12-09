@@ -61,8 +61,6 @@ Parser* init_parser(Lexer* lexer) {
 
 ASTNode* parse(Parser* parser) {
     ASTNode* chunk = parse_chunk(parser, TOKEN_EOF);
-    ast_dump(chunk);
-
     return chunk;
 }
 
@@ -84,8 +82,8 @@ static ASTNode* parse_chunk(Parser* parser, TokenKind fail) {
             add_to_ast_node_list(chunk->stmteez, expr);
         }
     }
-    node->chunk = *chunk;
 
+    node->chunk = *chunk;
     return node;
 }
 
@@ -113,7 +111,6 @@ static ASTNode* parse_local_assignment(Parser* parser) {
     }
 
     node->assignment = *asgmt;
-
     return node;
 }
 
@@ -187,8 +184,8 @@ static ASTNode* parse_expr(Parser* parser) {
         node = make_node(ASTNODE_FUNC_EXPR);
         FuncExpr* func_expr = parse_func_expr(parser);
         node->func_expr = *func_expr;
-        print_ast_node(node, 0);
     }
+
     return node;
 }
 

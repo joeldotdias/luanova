@@ -14,7 +14,7 @@ static Token* make_sym_token(TokenKind kind);
 static char peek(Lexer* lexer);
 static char peek_peek(Lexer* lexer);
 static void eat_whitespace(Lexer* lexer);
-static void advance(Lexer* lexer);
+static void advance_lexer(Lexer* lexer);
 static char* read_file(const char* path);
 
 Lexer* init_lexer(const char* filepath) {
@@ -118,7 +118,7 @@ Token* next_token(Lexer* lexer) {
             break;
         case '<':
             if(peek(lexer) == '=') {
-                advance(lexer);
+                advance_lexer(lexer);
                 token = make_sym_token(TOKEN_LESSER_THAN_EQ);
             } else {
                 token = make_sym_token(TOKEN_LESSER_THAN);
@@ -126,7 +126,7 @@ Token* next_token(Lexer* lexer) {
             break;
         case '>':
             if(peek(lexer) == '=') {
-                advance(lexer);
+                advance_lexer(lexer);
                 token = make_sym_token(TOKEN_GREATER_THAN_EQ);
             } else {
                 token = make_sym_token(TOKEN_GREATER_THAN);
@@ -136,7 +136,7 @@ Token* next_token(Lexer* lexer) {
         case '\'':
         case '"':
             // eat opening delimeter
-            advance(lexer);
+            advance_lexer(lexer);
             token = read_str_literal(lexer, curr_char);
             break;
 
@@ -159,7 +159,7 @@ Token* next_token(Lexer* lexer) {
             }
     }
 
-    advance(lexer);
+    advance_lexer(lexer);
 
     if(value != NULL) {
         free(value);
@@ -184,8 +184,18 @@ static Token* read_str_literal(Lexer* lexer, char delim) {
             buffer_size += buffer_size / 2;
             buffer = realloc(buffer, buffer_size);
         }
+        if(curr_char == '\\') {
+            switch(peek(lexer)) {
+                case 'n':
+                    advance_lexer(lexer);
+                    buffer[len++] = '\n';
+                default:
+                    advance_lexer(lexer);
+                    curr_char = lexer->source[lexer->curr_pos];
+            }
+        }
         buffer[len++] = curr_char;
-        advance(lexer);
+        advance_lexer(lexer);
 
         if(curr_char == EOF) {
             break;
@@ -212,7 +222,7 @@ static Token* read_ident(Lexer* lexer) {
     while((curr_char = lexer->source[lexer->curr_pos]) &&
           (isalpha(curr_char) || isdigit(curr_char) || curr_char == '_')) {
         buffer[len++] = curr_char;
-        advance(lexer);
+        advance_lexer(lexer);
     }
     buffer[len] = '\0';
 
@@ -293,7 +303,7 @@ static Token* read_num_literal(Lexer* lexer) {
         }
 
         buffer[len++] = curr_char;
-        advance(lexer);
+        advance_lexer(lexer);
     }
     buffer[len] = '\0';
 
@@ -359,7 +369,7 @@ static char peek_peek(Lexer* lexer) {
     }
 }
 
-static void advance(Lexer* lexer) {
+static void advance_lexer(Lexer* lexer) {
     lexer->curr_pos = lexer->peek_pos;
     if(lexer->peek_pos < lexer->source_len) {
         ++lexer->peek_pos;
@@ -368,7 +378,7 @@ static void advance(Lexer* lexer) {
 
 static void eat_whitespace(Lexer* lexer) {
     while(isspace(lexer->source[lexer->curr_pos])) {
-        advance(lexer);
+        advance_lexer(lexer);
     }
 }
 
