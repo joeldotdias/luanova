@@ -569,7 +569,7 @@ char* token_to_str(Token* token) {
 static char* read_file(const char* path) {
     FILE* file = fopen(path, "r");
     if(!file) {
-        LOG_FATAL("Couldn't open %s", path);
+        FATAL("Couldn't open %s", path);
     }
 
     fseek(file, 0, SEEK_END);

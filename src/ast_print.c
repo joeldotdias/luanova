@@ -5,19 +5,17 @@
 #include "ast.h"
 #include "shared.h"
 
-#define COLOR_RESET "\x1b[0m"
-#define COLOR_KEY "\x1b[1;36m"
-#define COLOR_SYMBOL "\x1b[1;33m"
-#define COLOR_LITERAL "\x1b[1;31m"
-#define COLOR_NAME "\x1b[1;34m"
-
 static void print_chunk(Chunk* chunk, size_t indent);
 static void print_assignment(Assignment* asgmt, size_t indent);
 static void print_func_stmt(FuncStmt* func_stmt, size_t indent);
 static void print_func_expr(FuncExpr* func_expr, size_t indent);
 static void print_func_call(FuncCall* func_call, size_t indent);
+static void print_table_literal(TableLiteralExpr* table, size_t indent);
+static void print_table_element(TableElement* elem, size_t indent);
+static void print_index_expr(IndexExpr* index_expr, size_t indent);
 static void print_symbol(Symbol* var, size_t indent);
 static void print_str_literal(StrLiteral* str, size_t indent);
+static void print_num_literal(NumLiteral* num, size_t indent);
 static const char* binary_op_str(BinaryOperator op);
 static const char* unary_op_str(UnaryOperator op);
 
@@ -42,8 +40,7 @@ void print_ast_node(ASTNode* node, size_t indent) {
         case ASTNODE_CHUNK:
             print_chunk(&node->chunk, indent);
             break;
-        case ASTNODE_ASSIGN_STMT:
-        case ASTNODE_LOCAL_VAR_DECLR:
+        case ASTNODE_LOCAL_VAR_DECL:
             print_assignment(&node->assignment, indent);
             break;
         case ASTNODE_FUNC_CALL_STMT:
@@ -52,14 +49,26 @@ void print_ast_node(ASTNode* node, size_t indent) {
         case ASTNODE_SYMBOL:
             print_symbol(&node->symbol, indent);
             break;
-        case ASTNODE_STR_LITERAL:
-            print_str_literal(&node->str_literal, indent);
-            break;
         case ASTNODE_FUNC_EXPR:
             print_func_expr(&node->func_expr, indent);
             break;
         case ASTNODE_FUNC_STMT:
             print_func_stmt(&node->func_stmt, indent);
+            break;
+        case ASTNODE_TABLE_LITERAL:
+            print_table_literal(&node->table_literal, indent);
+            break;
+        case ASTNODE_TABLE_ELEMENT:
+            print_table_element(&node->table_elem, indent);
+            break;
+        case ASTNODE_INDEX_EXPR:
+            print_index_expr(&node->index_expr, indent);
+            break;
+        case ASTNODE_STR_LITERAL:
+            print_str_literal(&node->str_literal, indent);
+            break;
+        case ASTNODE_NUM_LITERAL:
+            print_num_literal(&node->num_literal, indent);
             break;
         default:
             INFO("RECV %s", node_to_str(node));
@@ -68,74 +77,101 @@ void print_ast_node(ASTNode* node, size_t indent) {
 }
 
 static void print_chunk(Chunk* chunk, size_t indent) {
-    INDENTED(indent, COLOR_KEY "CHUNK:" COLOR_RESET);
+    INDENTED(indent, COLOR_KEY "CHUNK:");
     for(size_t i = 0; i < chunk->stmteez->count; i++) {
         print_ast_node(chunk->stmteez->nodes[i], indent + 1);
     }
 }
 
 static void print_assignment(Assignment* asgmt, size_t indent) {
-    INDENTED(indent, COLOR_KEY "ASSIGNMENT:" COLOR_RESET);
+    INDENTED(indent, COLOR_KEY "ASSIGNMENT:");
 
     for(size_t i = 0; i < asgmt->var_list->count; i++) {
         print_symbol(asgmt->var_list->symbols[i], indent + 1);
-        INDENTED(indent + 1, COLOR_KEY "VALUE:" COLOR_RESET);
+        INDENTED(indent + 1, COLOR_KEY "VALUE:");
         print_ast_node(asgmt->expr_list->nodes[i], indent + 2);
     }
 }
 
 static void print_func_call(FuncCall* func_call, size_t indent) {
-    INDENTED(indent, COLOR_KEY "FUNCTION CALL:" COLOR_RESET);
-    INDENTED(indent + 1, COLOR_KEY "NAME: " COLOR_NAME "%s" COLOR_RESET, func_call->name);
+    INDENTED(indent, COLOR_KEY "FUNCTION CALL:");
+    INDENTED(indent + 1, COLOR_KEY "NAME: " COLOR_NAME "%s", func_call->name);
 
     if(func_call->prefix) {
-        INDENTED(indent + 1, COLOR_KEY "PREFIX:" COLOR_RESET);
+        INDENTED(indent + 1, COLOR_KEY "PREFIX:");
         print_ast_node(func_call->prefix, indent + 2);
     }
 
     if(func_call->args) {
-        INDENTED(indent + 1, COLOR_KEY "ARGS:" COLOR_RESET);
+        INDENTED(indent + 1, COLOR_KEY "ARGS:");
         for(size_t i = 0; i < func_call->args->count; i++) {
             print_ast_node(func_call->args->nodes[i], indent + 2);
         }
     }
 }
 
+static void print_func_stmt(FuncStmt* func_stmt, size_t indent) {
+    INDENTED(indent, COLOR_KEY "FUNCTION<%s>:",
+             func_stmt->name->scope ? func_stmt->name->scope->name : "");
+
+    INDENTED(indent + 1, COLOR_KEY "NAME: " COLOR_NAME "%s", func_stmt->name->name);
+
+    print_ast_node(func_stmt->func_expr, indent + 1);
+}
+
 static void print_func_expr(FuncExpr* func_expr, size_t indent) {
     INDENTED(indent, COLOR_KEY "FUNC EXPR:");
     if(func_expr->params) {
-        INDENTED(indent + 1, COLOR_KEY "PARAMS:" COLOR_RESET);
+        INDENTED(indent + 1, COLOR_KEY "PARAMS:");
         for(size_t i = 0; i < func_expr->params->count; i++) {
             print_symbol(func_expr->params->symbols[i], indent + 2);
         }
     }
-    INDENTED(indent + 1, COLOR_KEY "BODY:" COLOR_RESET);
+    INDENTED(indent + 1, COLOR_KEY "BODY:");
     print_ast_node(func_expr->body, indent + 2);
 }
 
-static void print_func_stmt(FuncStmt* func_stmt, size_t indent) {
-    INDENTED(indent, COLOR_KEY "FUNCTION<%s>:" COLOR_RESET,
-             func_stmt->func_expr->scope ? func_stmt->func_expr->scope->name : "");
+static void print_table_literal(TableLiteralExpr* table, size_t indent) {
+    INDENTED(indent, COLOR_KEY "TABLE:");
+    for(size_t i = 0; i < table->expr_list->count; i++) {
+        print_ast_node(table->expr_list->nodes[i], indent + 1);
+    }
+}
 
-    INDENTED(indent + 1, COLOR_KEY "NAME: " COLOR_NAME "%s" COLOR_RESET,
-             func_stmt->name->name);
+static void print_table_element(TableElement* elem, size_t indent) {
+    INDENTED(indent, COLOR_KEY "TABLE ELEMENT:");
+    if(elem->key) {
+        INDENTED(indent + 1, COLOR_KEY "KEY:");
+        print_ast_node(elem->key, indent + 2);
+        INDENTED(indent + 1, COLOR_KEY "VALUE: ");
+        print_ast_node(elem->value, indent + 2);
+    } else {
+        print_ast_node(elem->value, indent + 1);
+    }
+}
 
-    print_func_expr(func_stmt->func_expr, indent + 1);
+static void print_index_expr(IndexExpr* index_expr, size_t indent) {
+    INDENTED(indent, COLOR_KEY "INDEX:");
+    print_ast_node(index_expr->expr, indent + 1);
 }
 
 static void print_symbol(Symbol* symbol, size_t indent) {
     if(symbol->scope) {
-        INDENTED(indent, COLOR_SYMBOL "SYMBOL<%s>: %s" COLOR_RESET, symbol->scope->name,
+        INDENTED(indent, COLOR_SYMBOL "SYMBOL<%s>: %s", symbol->scope->name,
                  symbol->name);
     } else {
-        INDENTED(indent, COLOR_SYMBOL "SYMBOL:%s" COLOR_RESET, symbol->name);
+        INDENTED(indent, COLOR_SYMBOL "SYMBOL:%s", symbol->name);
     }
 }
 
 static void print_str_literal(StrLiteral* str, size_t indent) {
     char* escaped_str = escaped_str_to_display(str->str_val);
-    INDENTED(indent, COLOR_KEY "STRING: " COLOR_LITERAL "%s" COLOR_RESET, escaped_str);
+    INDENTED(indent, COLOR_KEY "STRING: " COLOR_LITERAL "%s", escaped_str);
     free(escaped_str);
+}
+
+static void print_num_literal(NumLiteral* num, size_t indent) {
+    INDENTED(indent, COLOR_KEY "NUMBER: " COLOR_LITERAL "%f", num->num_val);
 }
 
 static const char* binary_op_str(BinaryOperator op) {
@@ -251,37 +287,33 @@ char* node_to_str(ASTNode* node) {
             return "ASTNODE_CHUNK";
         case ASTNODE_BLOCK:
             return "ASTNODE_BLOCK";
-
         // statements
-        case ASTNODE_ASSIGN_STMT:
-            return "ASTNODE_ASSIGN_STMT";
-        case ASTNODE_FUNC_CALL_STMT:
-            return "ASTNODE_FUNC_CALL_STMT";
+        case ASTNODE_LOCAL_VAR_DECL:
+            return "ASTNODE_LOCAL_VAR_DECL";
+        case ASTNODE_IF_STMT:
+            return "ASTNODE_IF_STMT";
         case ASTNODE_DO_STMT:
             return "ASTNODE_DO_STMT";
         case ASTNODE_WHILE_STMT:
             return "ASTNODE_WHILE_STMT";
+        case ASTNODE_FOR_NUMERIC_STMT:
+            return "ASTNODE_FOR_NUMERIC_STMT";
+        case ASTNODE_FOR_GENERIC_STMT:
+            return "ASTNODE_FOR_GENERIC_STMT";
         case ASTNODE_REPEAT_STMT:
             return "ASTNODE_REPEAT_STMT";
-        case ASTNODE_IF_STMT:
-            return "ASTNODE_IF_STMT";
-        case ASTNODE_NUMERIC_STMT:
-            return "ASTNODE_NUMERIC_STMT";
-        case ASTNODE_GENERIC_STMT:
-            return "ASTNODE_GENERIC_STMT";
-        case ASTNODE_FUNC_DECLR:
-            return "ASTNODE_FUNC_DECLR";
-        case ASTNODE_LOCAL_FUNC_DECLR:
-            return "ASTNODE_LOCAL_FUNC_DECLR";
-        case ASTNODE_LOCAL_VAR_DECLR:
-            return "ASTNODE_LOCAL_VAR_DECLR";
-        case ASTNODE_RETURN_STMT:
-            return "ASTNODE_RETURN_STMT";
         case ASTNODE_BREAK_STMT:
             return "ASTNODE_BREAK_STMT";
         case ASTNODE_FUNC_STMT:
             return "ASTNODE_FUNC_STMT";
-
+        case ASTNODE_FUNC_CALL_STMT:
+            return "ASTNODE_FUNC_CALL_STMT";
+        case ASTNODE_RETURN_STMT:
+            return "ASTNODE_RETURN_STMT";
+        case ASTNODE_LABEL_STMT:
+            return "ASTNODE_LABEL_STMT";
+        case ASTNODE_GOTO_STMT:
+            return "ASTNODE_GOTO_STMT";
         // expressions
         case ASTNODE_NIL_LITERAL:
             return "ASTNODE_NIL_LITERAL";
@@ -291,19 +323,20 @@ char* node_to_str(ASTNode* node) {
             return "ASTNODE_NUM_LITERAL";
         case ASTNODE_STR_LITERAL:
             return "ASTNODE_STR_LITERAL";
+        case ASTNODE_INDEX_EXPR:
+            return "ASTNODE_INDEX_EXPR";
         case ASTNODE_VARARG_EXPR:
             return "ASTNODE_VARARG_EXPR";
         case ASTNODE_FUNC_EXPR:
             return "ASTNODE_FUNC_EXPR";
         case ASTNODE_PREFIX_EXPR:
             return "ASTNODE_PREFIX_EXPR";
-        case ASTNODE_TABLE_CONSTRUCTOR:
-            return "ASTNODE_TABLE_CONSTRUCTOR";
         case ASTNODE_BINARY_EXPR:
             return "ASTNODE_BINARY_EXPR";
         case ASTNODE_UNARY_EXPR:
             return "ASTNODE_UNARY_EXPR";
-
+        case ASTNODE_BUILTIN_EXPR:
+            return "ASTNODE_BUILTIN_EXPR";
         // variable stuff
         case ASTNODE_SYMBOL:
             return "ASTNODE_SYMBOL";
@@ -313,12 +346,10 @@ char* node_to_str(ASTNode* node) {
             return "ASTNODE_FIELD_VAR";
 
         // table related
-        case ASTNODE_TABLE_FIELD:
+        case ASTNODE_TABLE_LITERAL:
+            return "ASTNODE_TABLE_LITERAL";
+        case ASTNODE_TABLE_ELEMENT:
             return "ASTNODE_TABLE_FIELD";
-        case ASTNODE_TABLE_INDEXED_FIELD:
-            return "ASTNODE_TABLE_INDEXED_FIELD";
-        case ASTNODE_TABLE_NAMED_FIELD:
-            return "ASTNODE_TABLE_NAMED_FIELD";
 
         default:
             return "UNKNOWN_NODE_KIND";

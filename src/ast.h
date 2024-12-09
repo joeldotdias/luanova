@@ -5,12 +5,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define COLOR_RESET "\x1b[0m"
+#define COLOR_KEY "\x1b[1;36m"
+#define COLOR_SYMBOL "\x1b[1;33m"
+#define COLOR_LITERAL "\x1b[1;31m"
+#define COLOR_NAME "\x1b[1;34m"
+
 #define INDENTED(depth, format, ...)                                                     \
     do {                                                                                 \
         for(size_t i = 0; i < (depth) * 2; i++) {                                        \
             printf(" ");                                                                 \
         }                                                                                \
-        printf(format "\n", ##__VA_ARGS__);                                              \
+        printf(format COLOR_RESET "\n", ##__VA_ARGS__);                                  \
     } while(0)
 
 typedef enum {
@@ -19,32 +25,32 @@ typedef enum {
     ASTNODE_BLOCK,
 
     // statements
-    ASTNODE_ASSIGN_STMT,
-    ASTNODE_FUNC_CALL_STMT,
+    ASTNODE_LOCAL_VAR_DECL,
+    ASTNODE_IF_STMT,
     ASTNODE_DO_STMT,
     ASTNODE_WHILE_STMT,
+    ASTNODE_FOR_NUMERIC_STMT,
+    ASTNODE_FOR_GENERIC_STMT, // for in
     ASTNODE_REPEAT_STMT,
-    ASTNODE_IF_STMT,
-    ASTNODE_NUMERIC_STMT,
-    ASTNODE_GENERIC_STMT,
-    ASTNODE_FUNC_DECLR,
-    ASTNODE_LOCAL_FUNC_DECLR,
-    ASTNODE_LOCAL_VAR_DECLR,
-    ASTNODE_RETURN_STMT,
     ASTNODE_BREAK_STMT,
     ASTNODE_FUNC_STMT,
+    ASTNODE_FUNC_CALL_STMT,
+    ASTNODE_RETURN_STMT,
+    ASTNODE_LABEL_STMT,
+    ASTNODE_GOTO_STMT,
 
     // expressions
     ASTNODE_NIL_LITERAL,
     ASTNODE_BOOL_LITERAL,
     ASTNODE_NUM_LITERAL,
     ASTNODE_STR_LITERAL,
+    ASTNODE_INDEX_EXPR,
     ASTNODE_VARARG_EXPR,
     ASTNODE_FUNC_EXPR,
     ASTNODE_PREFIX_EXPR,
-    ASTNODE_TABLE_CONSTRUCTOR,
     ASTNODE_BINARY_EXPR,
     ASTNODE_UNARY_EXPR,
+    ASTNODE_BUILTIN_EXPR,
 
     // variable stuff
     ASTNODE_SYMBOL,
@@ -52,9 +58,10 @@ typedef enum {
     ASTNODE_FIELD_VAR,
 
     // table related
-    ASTNODE_TABLE_FIELD,
-    ASTNODE_TABLE_INDEXED_FIELD,
-    ASTNODE_TABLE_NAMED_FIELD,
+    ASTNODE_TABLE_LITERAL,
+    ASTNODE_TABLE_ELEMENT,
+    // ASTNODE_TABLE_INDEXED_FIELD,
+    // ASTNODE_TABLE_NAMED_FIELD,
 } NodeKind;
 
 typedef enum {
@@ -118,7 +125,6 @@ struct Scope {
 
 typedef struct {
     ASTNodeList* stmteez;
-    // ASTNode* last_stmt;
 } Chunk;
 
 typedef struct {
@@ -162,7 +168,6 @@ typedef struct {
 } ForGeneric;
 
 typedef struct {
-    Symbol* name;
     Scope* scope;
     SymbolList* params;
     ASTNode* body;
@@ -173,7 +178,8 @@ typedef struct {
 typedef struct {
     Symbol* name;
     ASTNodeList* Selectors;
-    FuncExpr* func_expr;
+    // FuncExpr* func_expr;
+    ASTNode* func_expr;
 } FuncStmt;
 
 typedef struct {
@@ -198,10 +204,14 @@ struct Symbol {
     } symbol_kind;
 };
 
+// typedef struct {
+//     ASTNode* prefix;
+//     ASTNode* index;
+// } IndexedVar;
+
 typedef struct {
-    ASTNode* prefix;
-    ASTNode* index;
-} IndexedVar;
+    ASTNode* expr;
+} IndexExpr;
 
 typedef struct {
     ASTNode* left;
@@ -232,6 +242,15 @@ typedef struct {
 } TableConstructor;
 
 typedef struct {
+    ASTNode* key; // might be null in case of a list
+    ASTNode* value;
+} TableElement;
+
+typedef struct {
+    ASTNodeList* expr_list; // this will be of type TableElementAssignmnetExpr
+} TableLiteralExpr;
+
+typedef struct {
     ASTNode* key;
     ASTNode* val;
 } TableField;
@@ -250,9 +269,12 @@ struct ASTNode {
         FuncStmt func_stmt;
         FuncExpr func_expr;
         FuncCall func_call;
+        TableLiteralExpr table_literal;
+        TableElement table_elem;
         ReturnStmt return_stmt;
         Symbol symbol;
-        IndexedVar indexed_var;
+        IndexExpr index_expr;
+        // IndexedVar indexed_var;
         BinaryExpr binary_expr;
         UnaryExpr unary_expr;
         NumLiteral num_literal;

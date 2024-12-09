@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define LOG_FATAL(fmt, ...)                                                              \
+#define FATAL(fmt, ...)                                                                  \
     do {                                                                                 \
         printf("\033[31m" fmt "\033[0m\n", ##__VA_ARGS__);                               \
         exit(EXIT_FAILURE);                                                              \

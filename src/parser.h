@@ -5,7 +5,7 @@
 #include "lexer.h"
 
 #define FAILED_EXPECTATION(expected)                                                     \
-    LOG_FATAL("EXPECTED %s | RECEIVED %s", expected, token_to_str(parser->curr_token))
+    FATAL("EXPECTED %s | RECEIVED %s", expected, token_to_str(parser->curr_token))
 
 typedef struct {
     Scope* curr_scope;

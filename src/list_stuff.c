@@ -8,13 +8,13 @@
 SymbolList* init_symbol_list() {
     SymbolList* list = malloc(sizeof(SymbolList));
     if(!list) {
-        LOG_FATAL("Couldn't allocate memory for symbol list");
+        FATAL("Couldn't allocate memory for symbol list");
     }
 
     list->symbols = malloc(10 * sizeof(Symbol*));
     if(!list->symbols) {
         free(list);
-        LOG_FATAL("Couln't allocate symbols mem");
+        FATAL("Couln't allocate symbols mem");
     }
 
     list->count = 0;
@@ -35,7 +35,7 @@ void add_to_symbol_list(SymbolList* list, Symbol* symbol) {
         size_t new_capacity = list->capacity += 2;
         Symbol** new_symbols = realloc(list->symbols, new_capacity * sizeof(Symbol*));
         if(!new_symbols) {
-            LOG_FATAL("Couldn't reallocate symbol list");
+            FATAL("Couldn't reallocate symbol list");
         }
         list->symbols = new_symbols;
         list->capacity = new_capacity;
@@ -54,13 +54,13 @@ void print_symbol_list(const SymbolList* list) {
 ASTNodeList* init_ast_node_list() {
     ASTNodeList* list = malloc(sizeof(SymbolList));
     if(!list) {
-        LOG_FATAL("Couldn't allocate memory for ast node list");
+        FATAL("Couldn't allocate memory for ast node list");
     }
 
     list->nodes = malloc(10 * sizeof(Symbol*));
     if(!list->nodes) {
         free(list);
-        LOG_FATAL("Couln't allocate nodes mem");
+        FATAL("Couln't allocate nodes mem");
     }
 
     list->count = 0;
@@ -74,7 +74,7 @@ void add_to_ast_node_list(ASTNodeList* list, ASTNode* node) {
         size_t new_capacity = list->capacity += 2;
         ASTNode** new_nodes = realloc(list->nodes, new_capacity * sizeof(ASTNode*));
         if(!new_nodes) {
-            LOG_FATAL("Couldn't reallocate node list");
+            FATAL("Couldn't reallocate node list");
         }
         list->nodes = new_nodes;
         list->capacity = new_capacity;
