@@ -39,6 +39,7 @@ static ASTNode* make_node(NodeKind kind);
 static Token* consume_token(Parser* parser, TokenKind expected);
 static bool expect_token(Parser* parser, TokenKind expected);
 static void advance_parser(Parser* parser);
+static void maybe_give_scope_a_name(ASTNode* lhs, ASTNode* rhs);
 static char* get_name_val_from_node(const ASTNode* node);
 
 Parser* init_parser(Lexer* lexer) {
@@ -147,6 +148,15 @@ static ASTNode* parse_local_assignment(Parser* parser) {
             char* scope_name = malloc(strlen("FUNC_") + strlen(assignee->name) + 1);
             sprintf(scope_name, "FUNC_%s", assignee->name);
             asgmt->expr_list->nodes[i]->func_expr.scope->name = scope_name;
+        } else if(asgmt->expr_list->nodes[i]->kind == ASTNODE_TABLE_LITERAL) {
+            Symbol* assignee = asgmt->var_list->symbols[i];
+            if(!assignee) {
+                continue;
+            }
+
+            char* scope_name = malloc(strlen("FUNC_") + strlen(assignee->name) + 1);
+            sprintf(scope_name, "TABLE_%s", assignee->name);
+            asgmt->expr_list->nodes[i]->table_literal.scope->name = scope_name;
         }
     }
 
@@ -213,8 +223,13 @@ static ASTNode* parse_func_expr(Parser* parser) {
 }
 
 static ASTNode* parse_return(Parser* parser) {
-    UNIMPLEMENTED();
+    if(!consume_token(parser, TOKEN_RETURN)) {
+        FAILED_EXPECTATION("RETURN");
+    }
     ASTNode* node = make_node(ASTNODE_RETURN_STMT);
+    ReturnStmt* ret_stmt = calloc(1, sizeof(ReturnStmt));
+    ret_stmt->return_val = parse_expr(parser);
+    node->return_stmt = *ret_stmt;
     return node;
 }
 
@@ -273,6 +288,8 @@ static ASTNode* parse_table_literal(Parser* parser) {
     ASTNode* node = make_node(ASTNODE_TABLE_LITERAL);
     TableLiteralExpr* table_literal = calloc(1, sizeof(TableLiteralExpr));
     table_literal->expr_list = init_ast_node_list();
+    Scope* ti_scope = enter_scope(parser->scope_tracker, node);
+    table_literal->scope = ti_scope;
 
     while(parser->curr_token->kind != TOKEN_RCURLY) {
         ASTNode* table_elem = parse_table_element(parser);
@@ -289,6 +306,7 @@ static ASTNode* parse_table_literal(Parser* parser) {
     }
 
     node->table_literal = *table_literal;
+    leave_scope(parser->scope_tracker);
 
     return node;
 }
@@ -312,14 +330,22 @@ static ASTNode* parse_table_element(Parser* parser) {
         elem->key = NULL;
     }
     elem->value = parse_expr(parser);
-    if(elem->value->kind == ASTNODE_FUNC_EXPR) {
+    maybe_give_scope_a_name(elem->key, elem->value);
+    /* if(elem->value->kind == ASTNODE_FUNC_EXPR) {
         if(elem->key) {
             char* identi = get_name_val_from_node(elem->key);
             char* scope_name = malloc(strlen("FUNC_INDEX_") + strlen(identi) + 1);
             sprintf(scope_name, "FUNC_INDEX_%s", identi);
             (&elem->value->func_expr)->scope->name = scope_name;
         }
-    }
+    } else if(elem->value->kind == ASTNODE_TABLE_LITERAL) {
+        if(elem->key) {
+            char* identi = get_name_val_from_node(elem->key);
+            char* scope_name = malloc(strlen("TABLE_INDEX_") + strlen(identi) + 1);
+            sprintf(scope_name, "TABLE_INDEX_%s", identi);
+            (&elem->value->table_literal)->scope->name = scope_name;
+        }
+    } */
 
     node->table_elem = *elem;
     return node;
@@ -533,6 +559,19 @@ static ASTNode* make_node(NodeKind kind) {
     ASTNode* node = calloc(1, sizeof(ASTNode));
     node->kind = kind;
     return node;
+}
+
+static void maybe_give_scope_a_name(ASTNode* lhs, ASTNode* rhs) {
+    char* ident = get_name_val_from_node(lhs);
+    if(rhs->kind == ASTNODE_FUNC_EXPR) {
+        char* scope_name = malloc(strlen("FUNC_INDEX_") + strlen(ident) + 1);
+        sprintf(scope_name, "FUNC_INDEX_%s", ident);
+        (&rhs->func_expr)->scope->name = scope_name;
+    } else if(rhs->kind == ASTNODE_TABLE_LITERAL) {
+        char* scope_name = malloc(strlen("TABLE_INDEX_") + strlen(ident) + 1);
+        sprintf(scope_name, "TABLE_INDEX_%s", ident);
+        (&rhs->table_literal)->scope->name = scope_name;
+    }
 }
 
 static char* get_name_val_from_node(const ASTNode* node) {

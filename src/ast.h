@@ -247,6 +247,7 @@ typedef struct {
 } TableElement;
 
 typedef struct {
+    Scope* scope;
     ASTNodeList* expr_list; // this will be of type TableElementAssignmnetExpr
 } TableLiteralExpr;
 

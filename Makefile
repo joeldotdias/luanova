@@ -1,7 +1,7 @@
 COMPILER = clang
 CFLAGS = -Wall -Wextra -g
 SOURCES = $(shell find src -name "*.c")
-TARGET = luanoia
+TARGET = luanova
 
 $(TARGET): $(SOURCES)
 	@$(COMPILER) $(SOURCES) -o $(TARGET)

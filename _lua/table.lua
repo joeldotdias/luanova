@@ -8,6 +8,8 @@ local t = {
 		end,
 	},
 	["str_idx"] = function()
+		local lem = 4
 		print("Oh what torture")
+		return lem
 	end,
 }

@@ -9,6 +9,7 @@ static void print_chunk(Chunk* chunk, size_t indent);
 static void print_assignment(Assignment* asgmt, size_t indent);
 static void print_func_stmt(FuncStmt* func_stmt, size_t indent);
 static void print_func_expr(FuncExpr* func_expr, size_t indent);
+static void print_return_stmt(ReturnStmt* ret_stmt, size_t indent);
 static void print_func_call(FuncCall* func_call, size_t indent);
 static void print_table_literal(TableLiteralExpr* table, size_t indent);
 static void print_table_element(TableElement* elem, size_t indent);
@@ -45,6 +46,9 @@ void print_ast_node(ASTNode* node, size_t indent) {
             break;
         case ASTNODE_FUNC_CALL_STMT:
             print_func_call(&node->func_call, indent);
+            break;
+        case ASTNODE_RETURN_STMT:
+            print_return_stmt(&node->return_stmt, indent);
             break;
         case ASTNODE_SYMBOL:
             print_symbol(&node->symbol, indent);
@@ -153,6 +157,11 @@ static void print_table_element(TableElement* elem, size_t indent) {
 static void print_index_expr(IndexExpr* index_expr, size_t indent) {
     INDENTED(indent, COLOR_KEY "INDEX:");
     print_ast_node(index_expr->expr, indent + 1);
+}
+
+static void print_return_stmt(ReturnStmt* ret_stmt, size_t indent) {
+    INDENTED(indent, COLOR_KEY "RETURN:");
+    print_ast_node(ret_stmt->return_val, indent + 1);
 }
 
 static void print_symbol(Symbol* symbol, size_t indent) {
