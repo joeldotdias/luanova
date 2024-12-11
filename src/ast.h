@@ -5,12 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define COLOR_RESET "\x1b[0m"
-#define COLOR_KEY "\x1b[1;36m"
-#define COLOR_SYMBOL "\x1b[1;33m"
-#define COLOR_LITERAL "\x1b[1;31m"
-#define COLOR_NAME "\x1b[1;34m"
-
 #define INDENTED(depth, format, ...)                                                     \
     do {                                                                                 \
         for(size_t i = 0; i < (depth) * 2; i++) {                                        \
@@ -34,23 +28,22 @@ typedef enum {
     ASTNODE_REPEAT_STMT,
     ASTNODE_BREAK_STMT,
     ASTNODE_FUNC_STMT,
-    ASTNODE_FUNC_CALL_STMT,
     ASTNODE_RETURN_STMT,
     ASTNODE_LABEL_STMT,
     ASTNODE_GOTO_STMT,
 
     // expressions
-    ASTNODE_NIL_LITERAL,
-    ASTNODE_BOOL_LITERAL,
-    ASTNODE_NUM_LITERAL,
-    ASTNODE_STR_LITERAL,
-    ASTNODE_INDEX_EXPR,
-    ASTNODE_VARARG_EXPR,
     ASTNODE_FUNC_EXPR,
-    ASTNODE_PREFIX_EXPR,
+    ASTNODE_FUNC_CALL_EXPR,
+    ASTNODE_INDEX_EXPR,
     ASTNODE_BINARY_EXPR,
     ASTNODE_UNARY_EXPR,
     ASTNODE_BUILTIN_EXPR,
+    ASTNODE_VARARG_EXPR,
+    ASTNODE_STR_LITERAL,
+    ASTNODE_NUM_LITERAL,
+    ASTNODE_BOOL_LITERAL,
+    ASTNODE_NIL_LITERAL,
 
     // variable stuff
     ASTNODE_SYMBOL,
@@ -60,8 +53,6 @@ typedef enum {
     // table related
     ASTNODE_TABLE_LITERAL,
     ASTNODE_TABLE_ELEMENT,
-    // ASTNODE_TABLE_INDEXED_FIELD,
-    // ASTNODE_TABLE_NAMED_FIELD,
 } NodeKind;
 
 typedef enum {
@@ -83,13 +74,17 @@ typedef enum {
     OP_OR,
 
     OP_CONCAT,
-} BinaryOperator;
+
+    NO_INFIX,
+} InfixOperator;
 
 typedef enum {
     OP_NEGATE,
     OP_NOT,
     OP_LENGTH,
-} UnaryOperator;
+
+    NO_PREFIX,
+} PrefixOperator;
 
 typedef struct ASTNode ASTNode;
 typedef struct Scope Scope;
@@ -215,12 +210,12 @@ typedef struct {
 
 typedef struct {
     ASTNode* left;
-    BinaryOperator op;
+    InfixOperator op;
     ASTNode* right;
 } BinaryExpr;
 
 typedef struct {
-    UnaryOperator op;
+    PrefixOperator op;
     ASTNode* operand;
 } UnaryExpr;
 

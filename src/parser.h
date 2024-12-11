@@ -19,6 +19,11 @@ typedef struct {
     ScopeTracker* scope_tracker;
 } Parser;
 
+typedef struct {
+    int left_bind;
+    int right_bind;
+} Precedence;
+
 Parser* init_parser(Lexer* lexer);
 void annihilate_parser(Parser** parser);
 ASTNode* parse(Parser* parser);

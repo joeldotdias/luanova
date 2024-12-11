@@ -5,6 +5,13 @@
 #include "ast.h"
 #include "shared.h"
 
+#define COLOR_RESET "\x1b[0m"
+#define COLOR_KEY "\x1b[1;36m"
+#define COLOR_SYMBOL "\x1b[1;33m"
+#define COLOR_LITERAL "\x1b[1;31m"
+#define COLOR_NAME "\x1b[1;34m"
+#define COLOR_OPERATOR "\x1b[1;35m"
+
 static void print_chunk(Chunk* chunk, size_t indent);
 static void print_assignment(Assignment* asgmt, size_t indent);
 static void print_func_stmt(FuncStmt* func_stmt, size_t indent);
@@ -14,11 +21,13 @@ static void print_func_call(FuncCall* func_call, size_t indent);
 static void print_table_literal(TableLiteralExpr* table, size_t indent);
 static void print_table_element(TableElement* elem, size_t indent);
 static void print_index_expr(IndexExpr* index_expr, size_t indent);
+static void print_unary_expr(UnaryExpr* expr, size_t indent);
+static void print_binary_expr(BinaryExpr* expr, size_t indent);
 static void print_symbol(Symbol* var, size_t indent);
 static void print_str_literal(StrLiteral* str, size_t indent);
 static void print_num_literal(NumLiteral* num, size_t indent);
-static const char* binary_op_str(BinaryOperator op);
-static const char* unary_op_str(UnaryOperator op);
+static const char* binary_op_str(InfixOperator op);
+static const char* unary_op_str(PrefixOperator op);
 
 // helpers to display strings with escape sequences
 // these don't change the actual representation of the parsed string
@@ -44,20 +53,17 @@ void print_ast_node(ASTNode* node, size_t indent) {
         case ASTNODE_LOCAL_VAR_DECL:
             print_assignment(&node->assignment, indent);
             break;
-        case ASTNODE_FUNC_CALL_STMT:
-            print_func_call(&node->func_call, indent);
+        case ASTNODE_FUNC_STMT:
+            print_func_stmt(&node->func_stmt, indent);
             break;
         case ASTNODE_RETURN_STMT:
             print_return_stmt(&node->return_stmt, indent);
             break;
-        case ASTNODE_SYMBOL:
-            print_symbol(&node->symbol, indent);
-            break;
         case ASTNODE_FUNC_EXPR:
             print_func_expr(&node->func_expr, indent);
             break;
-        case ASTNODE_FUNC_STMT:
-            print_func_stmt(&node->func_stmt, indent);
+        case ASTNODE_FUNC_CALL_EXPR:
+            print_func_call(&node->func_call, indent);
             break;
         case ASTNODE_TABLE_LITERAL:
             print_table_literal(&node->table_literal, indent);
@@ -67,6 +73,15 @@ void print_ast_node(ASTNode* node, size_t indent) {
             break;
         case ASTNODE_INDEX_EXPR:
             print_index_expr(&node->index_expr, indent);
+            break;
+        case ASTNODE_BINARY_EXPR:
+            print_binary_expr(&node->binary_expr, indent);
+            break;
+        case ASTNODE_UNARY_EXPR:
+            print_unary_expr(&node->unary_expr, indent);
+            break;
+        case ASTNODE_SYMBOL:
+            print_symbol(&node->symbol, indent);
             break;
         case ASTNODE_STR_LITERAL:
             print_str_literal(&node->str_literal, indent);
@@ -97,6 +112,32 @@ static void print_assignment(Assignment* asgmt, size_t indent) {
     }
 }
 
+static void print_func_stmt(FuncStmt* func_stmt, size_t indent) {
+    INDENTED(indent, COLOR_KEY "FUNCTION<%s>:",
+             func_stmt->name->scope ? func_stmt->name->scope->name : "");
+
+    INDENTED(indent + 1, COLOR_KEY "NAME: " COLOR_NAME "%s", func_stmt->name->name);
+
+    print_ast_node(func_stmt->func_expr, indent + 1);
+}
+
+static void print_return_stmt(ReturnStmt* ret_stmt, size_t indent) {
+    INDENTED(indent, COLOR_KEY "RETURN:");
+    print_ast_node(ret_stmt->return_val, indent + 1);
+}
+
+static void print_func_expr(FuncExpr* func_expr, size_t indent) {
+    INDENTED(indent, COLOR_KEY "FUNC EXPR:");
+    if(func_expr->params) {
+        INDENTED(indent + 1, COLOR_KEY "PARAMS:");
+        for(size_t i = 0; i < func_expr->params->count; i++) {
+            print_symbol(func_expr->params->symbols[i], indent + 2);
+        }
+    }
+    INDENTED(indent + 1, COLOR_KEY "BODY:");
+    print_ast_node(func_expr->body, indent + 2);
+}
+
 static void print_func_call(FuncCall* func_call, size_t indent) {
     INDENTED(indent, COLOR_KEY "FUNCTION CALL:");
     INDENTED(indent + 1, COLOR_KEY "NAME: " COLOR_NAME "%s", func_call->name);
@@ -112,27 +153,6 @@ static void print_func_call(FuncCall* func_call, size_t indent) {
             print_ast_node(func_call->args->nodes[i], indent + 2);
         }
     }
-}
-
-static void print_func_stmt(FuncStmt* func_stmt, size_t indent) {
-    INDENTED(indent, COLOR_KEY "FUNCTION<%s>:",
-             func_stmt->name->scope ? func_stmt->name->scope->name : "");
-
-    INDENTED(indent + 1, COLOR_KEY "NAME: " COLOR_NAME "%s", func_stmt->name->name);
-
-    print_ast_node(func_stmt->func_expr, indent + 1);
-}
-
-static void print_func_expr(FuncExpr* func_expr, size_t indent) {
-    INDENTED(indent, COLOR_KEY "FUNC EXPR:");
-    if(func_expr->params) {
-        INDENTED(indent + 1, COLOR_KEY "PARAMS:");
-        for(size_t i = 0; i < func_expr->params->count; i++) {
-            print_symbol(func_expr->params->symbols[i], indent + 2);
-        }
-    }
-    INDENTED(indent + 1, COLOR_KEY "BODY:");
-    print_ast_node(func_expr->body, indent + 2);
 }
 
 static void print_table_literal(TableLiteralExpr* table, size_t indent) {
@@ -159,9 +179,22 @@ static void print_index_expr(IndexExpr* index_expr, size_t indent) {
     print_ast_node(index_expr->expr, indent + 1);
 }
 
-static void print_return_stmt(ReturnStmt* ret_stmt, size_t indent) {
-    INDENTED(indent, COLOR_KEY "RETURN:");
-    print_ast_node(ret_stmt->return_val, indent + 1);
+static void print_binary_expr(BinaryExpr* expr, size_t indent) {
+    INDENTED(indent, COLOR_KEY "BINARY:");
+    INDENTED(indent + 1, COLOR_KEY "OPERATOR: " COLOR_OPERATOR "%s",
+             binary_op_str(expr->op));
+    INDENTED(indent + 1, COLOR_KEY "LEFT:");
+    print_ast_node(expr->left, indent + 2);
+    INDENTED(indent + 1, COLOR_KEY "RIGHT:");
+    print_ast_node(expr->right, indent + 2);
+}
+
+static void print_unary_expr(UnaryExpr* expr, size_t indent) {
+    INDENTED(indent, COLOR_KEY "UNARY:");
+    INDENTED(indent + 1, COLOR_KEY "OPERATOR: " COLOR_OPERATOR "%s",
+             unary_op_str(expr->op));
+    INDENTED(indent + 1, COLOR_KEY "OPERAND:");
+    print_ast_node(expr->operand, indent + 2);
 }
 
 static void print_symbol(Symbol* symbol, size_t indent) {
@@ -183,7 +216,7 @@ static void print_num_literal(NumLiteral* num, size_t indent) {
     INDENTED(indent, COLOR_KEY "NUMBER: " COLOR_LITERAL "%f", num->num_val);
 }
 
-static const char* binary_op_str(BinaryOperator op) {
+static const char* binary_op_str(InfixOperator op) {
     switch(op) {
         case OP_ADD:
             return "+";
@@ -220,7 +253,7 @@ static const char* binary_op_str(BinaryOperator op) {
     }
 }
 
-static const char* unary_op_str(UnaryOperator op) {
+static const char* unary_op_str(PrefixOperator op) {
     switch(op) {
         case OP_NEGATE:
             return "-";
@@ -315,7 +348,7 @@ char* node_to_str(ASTNode* node) {
             return "ASTNODE_BREAK_STMT";
         case ASTNODE_FUNC_STMT:
             return "ASTNODE_FUNC_STMT";
-        case ASTNODE_FUNC_CALL_STMT:
+        case ASTNODE_FUNC_CALL_EXPR:
             return "ASTNODE_FUNC_CALL_STMT";
         case ASTNODE_RETURN_STMT:
             return "ASTNODE_RETURN_STMT";
@@ -338,8 +371,6 @@ char* node_to_str(ASTNode* node) {
             return "ASTNODE_VARARG_EXPR";
         case ASTNODE_FUNC_EXPR:
             return "ASTNODE_FUNC_EXPR";
-        case ASTNODE_PREFIX_EXPR:
-            return "ASTNODE_PREFIX_EXPR";
         case ASTNODE_BINARY_EXPR:
             return "ASTNODE_BINARY_EXPR";
         case ASTNODE_UNARY_EXPR:
