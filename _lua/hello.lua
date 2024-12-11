@@ -12,7 +12,6 @@ local function greet(abc, xyz)
 		local ben = "ten"
 		print(greeting, btr, ben)
 	end
-	print(greeting, str)
 end
 
 greet()

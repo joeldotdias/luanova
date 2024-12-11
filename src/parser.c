@@ -193,7 +193,6 @@ static ASTNode* parse_function_stmt(Parser* parser, bool is_local) {
     func_stmt->func_expr = func_expr_node;
 
     node->func_stmt = *func_stmt;
-    leave_scope(parser->scope_tracker);
 
     return node;
 }
@@ -218,6 +217,7 @@ static SymbolList* parse_assignment_lhs(Parser* parser) {
         var_symbol->scope = parser->scope_tracker->curr_scope;
         add_to_symbol_list(vars, var_symbol);
         add_symbol_to_scope(parser->scope_tracker->curr_scope, var_symbol);
+        /* print_symbol_list(parser->scope_tracker->curr_scope->symbol_lookup); */
 
         if(parser->curr_token->kind == TOKEN_COMMA) {
             advance_parser(parser);
@@ -267,7 +267,6 @@ static ASTNode* parse_expr_with_context(Parser* parser, int prec_threshold,
     prefix_op = prefix_op_from_tok(parser->curr_token);
 
     if(prefix_op != NO_PREFIX) {
-        INFO("We here");
         advance_parser(parser); // eat operator
         InfixOperator ignore;
         ASTNode* sub_expr = parse_expr_with_context(parser, UNARY_PREC, &ignore);
@@ -329,7 +328,9 @@ static ASTNode* parse_basic_expr(Parser* parser) {
 static ASTNode* parse_func_expr(Parser* parser) {
     ASTNode* node = make_node(ASTNODE_FUNC_EXPR);
     FuncExpr* func = calloc(1, sizeof(FuncExpr));
+    Scope* prev_scope = parser->scope_tracker->curr_scope;
     Scope* curr_scope = enter_scope(parser->scope_tracker, node);
+    curr_scope->parent = prev_scope;
     func->scope = curr_scope;
 
     if(!consume_token(parser, TOKEN_LPAREN)) {
@@ -488,6 +489,7 @@ static ASTNode* parse_symbol(Parser* parser, bool is_confined_to_curr_scope) {
             resolve_symbol(parser->scope_tracker->curr_scope, ident->value);
         if(!resolved_symbol) {
             FATAL("Couldn't find symbol %s", ident->value);
+            /* return */
         }
         node->symbol = *resolved_symbol;
     }
@@ -509,7 +511,6 @@ static ASTNode* parse_str_literal(Parser* parser) {
 }
 
 static ASTNode* parse_num_literal(Parser* parser) {
-    /* INFO("We be parsing this"); */
     ASTNode* node = make_node(ASTNODE_NUM_LITERAL);
     NumLiteral* num = calloc(1, sizeof(NumLiteral));
     Token* num_tok = consume_token(parser, TOKEN_NUMBER);
@@ -578,6 +579,7 @@ static void add_symbol_to_scope(Scope* scope, Symbol* symbol) {
 }
 
 static Symbol* look_for_symbol(SymbolList* symbol_lookup, const char* name) {
+    /* print_symbol_list(symbol_lookup); */
     for(size_t i = 0; i < symbol_lookup->count; i++) {
         if(strcmp(symbol_lookup->symbols[i]->name, name) == 0) {
             return symbol_lookup->symbols[i];

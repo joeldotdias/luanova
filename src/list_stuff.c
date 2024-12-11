@@ -52,12 +52,12 @@ void print_symbol_list(const SymbolList* list) {
 }
 
 ASTNodeList* init_ast_node_list() {
-    ASTNodeList* list = malloc(sizeof(SymbolList));
+    ASTNodeList* list = malloc(sizeof(ASTNodeList));
     if(!list) {
         FATAL("Couldn't allocate memory for ast node list");
     }
 
-    list->nodes = malloc(10 * sizeof(Symbol*));
+    list->nodes = malloc(10 * sizeof(ASTNode*));
     if(!list->nodes) {
         free(list);
         FATAL("Couln't allocate nodes mem");
