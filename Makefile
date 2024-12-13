@@ -1,6 +1,6 @@
 COMPILER = clang
 CFLAGS = -Wall -Wextra -g
-SOURCES = $(shell find src -name "*.c")
+SOURCES = $(shell find src -name "*.c" -not -name "parserbak.c")
 TARGET = luanova
 
 $(TARGET): $(SOURCES)

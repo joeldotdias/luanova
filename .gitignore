@@ -1,3 +1,4 @@
 luanova
+src/parserbak.c
 *.out
 *.o

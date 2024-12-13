@@ -17,10 +17,12 @@ static void print_assignment(LocalAssignment* asgmt, size_t indent);
 static void print_func_stmt(FuncStmt* func_stmt, size_t indent);
 static void print_func_expr(FuncExpr* func_expr, size_t indent);
 static void print_return_stmt(ReturnStmt* ret_stmt, size_t indent);
+static void print_expr_stmt(ExprStmt* expr_stmt, size_t indent);
 static void print_func_call(FuncCall* func_call, size_t indent);
 static void print_table_literal(TableLiteralExpr* table, size_t indent);
 static void print_table_element(TableElement* elem, size_t indent);
 static void print_index_expr(IndexExpr* index_expr, size_t indent);
+static void print_suffixed_expr(SuffixedExpr* suffixed_expr, size_t indent);
 static void print_unary_expr(UnaryExpr* expr, size_t indent);
 static void print_binary_expr(BinaryExpr* expr, size_t indent);
 static void print_symbol(Symbol* var, size_t indent);
@@ -59,6 +61,9 @@ void print_ast_node(ASTNode* node, size_t indent) {
         case ASTNODE_RETURN_STMT:
             print_return_stmt(&node->return_stmt, indent);
             break;
+        case ASTNODE_EXPR_STMT:
+            print_expr_stmt(&node->expr_stmt, indent);
+            break;
         case ASTNODE_FUNC_EXPR:
             print_func_expr(&node->func_expr, indent);
             break;
@@ -73,6 +78,9 @@ void print_ast_node(ASTNode* node, size_t indent) {
             break;
         case ASTNODE_INDEX_EXPR:
             print_index_expr(&node->index_expr, indent);
+            break;
+        case ASTNODE_SUFFIXED_EXPR:
+            print_suffixed_expr(&node->suffixed_expr, indent);
             break;
         case ASTNODE_BINARY_EXPR:
             print_binary_expr(&node->binary_expr, indent);
@@ -126,6 +134,23 @@ static void print_return_stmt(ReturnStmt* ret_stmt, size_t indent) {
     print_ast_node(ret_stmt->return_val, indent + 1);
 }
 
+static void print_expr_stmt(ExprStmt* expr_stmt, size_t indent) {
+    INDENTED(indent, COLOR_KEY "EXPRESSION:");
+    if(expr_stmt->var_expr_list != NULL) {
+        INDENTED(indent + 1, COLOR_KEY "LHS:");
+        for(size_t i = 0; i < expr_stmt->var_expr_list->count; i++) {
+            print_ast_node(expr_stmt->var_expr_list->nodes[i], indent + 2);
+        }
+    }
+
+    if(expr_stmt->expr_list != NULL) {
+        INDENTED(indent + 1, COLOR_KEY "RHS:");
+        for(size_t i = 0; i < expr_stmt->expr_list->count; i++) {
+            print_ast_node(expr_stmt->expr_list->nodes[i], indent + 2);
+        }
+    }
+}
+
 static void print_func_expr(FuncExpr* func_expr, size_t indent) {
     INDENTED(indent, COLOR_KEY "FUNC EXPR:");
     if(func_expr->params) {
@@ -177,6 +202,18 @@ static void print_table_element(TableElement* elem, size_t indent) {
 static void print_index_expr(IndexExpr* index_expr, size_t indent) {
     INDENTED(indent, COLOR_KEY "INDEX:");
     print_ast_node(index_expr->expr, indent + 1);
+}
+
+static void print_suffixed_expr(SuffixedExpr* suffixed_expr, size_t indent) {
+    INDENTED(indent, COLOR_KEY "SUFFIXED:");
+    print_ast_node(suffixed_expr->primary_expr, indent + 1);
+
+    if(suffixed_expr->suffix_list != NULL) {
+        INDENTED(indent + 1, COLOR_KEY "SUFFIX LIST:");
+        for(size_t i = 0; i < suffixed_expr->suffix_list->count; i++) {
+            print_ast_node(suffixed_expr->suffix_list->nodes[i], indent + 2);
+        }
+    }
 }
 
 static void print_binary_expr(BinaryExpr* expr, size_t indent) {
@@ -356,6 +393,8 @@ char* node_to_str(ASTNode* node) {
             return "ASTNODE_LABEL_STMT";
         case ASTNODE_GOTO_STMT:
             return "ASTNODE_GOTO_STMT";
+        case ASTNODE_EXPR_STMT:
+            return "ASTNODE_EXPR_STMT";
         // expressions
         case ASTNODE_NIL_LITERAL:
             return "ASTNODE_NIL_LITERAL";
@@ -377,6 +416,8 @@ char* node_to_str(ASTNode* node) {
             return "ASTNODE_UNARY_EXPR";
         case ASTNODE_BUILTIN_EXPR:
             return "ASTNODE_BUILTIN_EXPR";
+        case ASTNODE_SUFFIXED_EXPR:
+            return "ASTNODE_SUFFIXED_EXPR";
         // variable stuff
         case ASTNODE_SYMBOL:
             return "ASTNODE_SYMBOL";

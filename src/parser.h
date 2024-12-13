@@ -3,6 +3,7 @@
 
 #include "ast.h"
 #include "lexer.h"
+#include "shared.h"
 
 #define CURR_TOKEN_IS(expected) (parser->curr_token->kind == (expected))
 

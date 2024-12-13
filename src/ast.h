@@ -164,6 +164,11 @@ typedef struct {
     ASTNode* body;
 } ForGeneric;
 
+typedef struct {
+    ASTNodeList* var_expr_list;
+    ASTNodeList* expr_list;
+} ExprStmt;
+
 /* a = "Hello" */
 typedef struct {
     SymbolList* var_list;
@@ -225,7 +230,7 @@ typedef struct {
  * object.field -> { base: object; suffix: field_selector(field) }
  */
 typedef struct {
-    ASTNode* base_expr;
+    ASTNode* primary_expr;
     ASTNodeList* suffix_list;
 } SuffixedExpr;
 
@@ -292,6 +297,8 @@ struct ASTNode {
         ReturnStmt return_stmt;
         Symbol symbol;
         IndexExpr index_expr;
+        SuffixedExpr suffixed_expr;
+        ExprStmt expr_stmt;
         // IndexedVar indexed_var;
         BinaryExpr binary_expr;
         UnaryExpr unary_expr;
