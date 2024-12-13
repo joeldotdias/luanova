@@ -13,7 +13,7 @@
 #define COLOR_OPERATOR "\x1b[1;35m"
 
 static void print_chunk(Chunk* chunk, size_t indent);
-static void print_assignment(Assignment* asgmt, size_t indent);
+static void print_assignment(LocalAssignment* asgmt, size_t indent);
 static void print_func_stmt(FuncStmt* func_stmt, size_t indent);
 static void print_func_expr(FuncExpr* func_expr, size_t indent);
 static void print_return_stmt(ReturnStmt* ret_stmt, size_t indent);
@@ -102,7 +102,7 @@ static void print_chunk(Chunk* chunk, size_t indent) {
     }
 }
 
-static void print_assignment(Assignment* asgmt, size_t indent) {
+static void print_assignment(LocalAssignment* asgmt, size_t indent) {
     INDENTED(indent, COLOR_KEY "ASSIGNMENT:");
 
     for(size_t i = 0; i < asgmt->var_list->count; i++) {

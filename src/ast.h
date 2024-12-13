@@ -33,9 +33,12 @@ typedef enum {
     ASTNODE_GOTO_STMT,
 
     // expressions
+    ASTNODE_EXPR_STMT,
+    ASTNODE_REASSIGNMENT_EXPR,
     ASTNODE_FUNC_EXPR,
     ASTNODE_FUNC_CALL_EXPR,
     ASTNODE_INDEX_EXPR,
+    ASTNODE_SUFFIXED_EXPR,
     ASTNODE_BINARY_EXPR,
     ASTNODE_UNARY_EXPR,
     ASTNODE_BUILTIN_EXPR,
@@ -122,12 +125,11 @@ typedef struct {
     ASTNodeList* stmteez;
 } Chunk;
 
+/* local a, b, c = "Hello", function() ... end, { ... } */
 typedef struct {
-    struct ASTNode* old_var_list;
     SymbolList* var_list;
     ASTNodeList* expr_list;
-    struct ASTNode* old_expr_list;
-} Assignment;
+} LocalAssignment;
 
 typedef struct {
     ASTNode* cond;
@@ -161,6 +163,12 @@ typedef struct {
     ASTNode* expr_list;
     ASTNode* body;
 } ForGeneric;
+
+/* a = "Hello" */
+typedef struct {
+    SymbolList* var_list;
+    ASTNodeList* expr_list;
+} ReassignExpr;
 
 typedef struct {
     Scope* scope;
@@ -207,6 +215,19 @@ struct Symbol {
 typedef struct {
     ASTNode* expr;
 } IndexExpr;
+
+/*
+ * Quite integral and has several types
+ * object.field -> { base: object; suffix: field_selector(field) }
+ * array[5] -> { base: array; suffix: index_expr([5]) }
+ * object.field -> { base: object; suffix: field_selector(field) }
+ * object.field -> { base: object; suffix: field_selector(field) }
+ * object.field -> { base: object; suffix: field_selector(field) }
+ */
+typedef struct {
+    ASTNode* base_expr;
+    ASTNodeList* suffix_list;
+} SuffixedExpr;
 
 typedef struct {
     ASTNode* left;
@@ -256,7 +277,7 @@ struct ASTNode {
 
     union {
         Chunk chunk;
-        Assignment assignment;
+        LocalAssignment assignment;
         WhileStmt while_stmt;
         RepeatStmt reapeat_stmt;
         IfStmt if_stmt;
@@ -265,6 +286,7 @@ struct ASTNode {
         FuncStmt func_stmt;
         FuncExpr func_expr;
         FuncCall func_call;
+        ReassignExpr reassign_expr;
         TableLiteralExpr table_literal;
         TableElement table_elem;
         ReturnStmt return_stmt;

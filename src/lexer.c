@@ -189,10 +189,14 @@ static Token* read_str_literal(Lexer* lexer, char delim) {
                 case 'n':
                     advance_lexer(lexer);
                     buffer[len++] = '\n';
-                default:
+                    break;
+                case 't':
                     advance_lexer(lexer);
-                    curr_char = lexer->source[lexer->curr_pos];
+                    buffer[len++] = '\t';
+                    break;
             }
+            advance_lexer(lexer);
+            curr_char = lexer->source[lexer->curr_pos];
         }
         buffer[len++] = curr_char;
         advance_lexer(lexer);

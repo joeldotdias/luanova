@@ -1,11 +1,11 @@
 local a = 10
 local b = 5
 
-function add(x, y)
+local function add(x, y)
 	return x + y
 end
 
-function check_number(num)
+local function check_number(num)
 	if num > 0 then
 		print(num .. " is positive")
 	elseif num < 0 then

@@ -4,6 +4,8 @@
 #include "ast.h"
 #include "lexer.h"
 
+#define CURR_TOKEN_IS(expected) (parser->curr_token->kind == (expected))
+
 #define FAILED_EXPECTATION(expected)                                                     \
     FATAL("EXPECTED %s | RECEIVED %s", expected, token_to_str(parser->curr_token))
 
