@@ -110,10 +110,9 @@ static ASTNode* parse_chunk(Parser* parser, TokenKind fail) {
             case TOKEN_LOCAL:
                 stmt = parse_local_assignment(parser);
                 break;
-            case TOKEN_RETURN:
+            /* case TOKEN_RETURN:
                 stmt = parse_return(parser);
-                break;
-
+                break; */
             case TOKEN_SEMICOLON:
                 advance_parser(parser);
                 continue;
@@ -216,18 +215,7 @@ static ASTNode* parse_local_function_stmt(Parser* parser) {
     return node;
 }
 
-static ASTNode* parse_return(Parser* parser) {
-    if(!consume_token(parser, TOKEN_RETURN)) {
-        FAILED_EXPECTATION("RETURN");
-    }
-
-    ASTNode* node = make_node(ASTNODE_RETURN_STMT);
-    ReturnStmt* ret_stmt = calloc(1, sizeof(ReturnStmt));
-    ret_stmt->return_val = parse_expr(parser);
-    memcpy(&node->return_stmt, ret_stmt, sizeof(ReturnStmt));
-    free(ret_stmt);
-    return node;
-}
+static ASTNode* parse_return(Parser* parser);
 
 static ASTNode* parse_expr_stmt(Parser* parser) {
     ASTNode* stmt = make_node(ASTNODE_EXPR_STMT);
@@ -346,24 +334,17 @@ static ASTNode* parse_expr_with_context(Parser* parser, int prec_threshold,
 
 static ASTNode* parse_basic_expr(Parser* parser) {
     ASTNode* expr = NULL;
+    INFO("In basic expr with %s", token_to_str(parser->curr_token));
 
     switch(parser->curr_token->kind) {
         case TOKEN_FUNCTION:
             advance_parser(parser);
             expr = parse_func_expr(parser);
             break;
-        case TOKEN_LCURLY:
+        /* case TOKEN_LCURLY:
             advance_parser(parser);
             expr = parse_table_literal(parser);
-            break;
-        case TOKEN_LPAREN:
-            advance_parser(parser);
-            expr = parse_expr(parser);
-            print_ast_node(expr, 0);
-            if(!consume_token(parser, TOKEN_RPAREN)) {
-                FATAL("Unbalanced parens");
-            }
-            break;
+            break; */
         case TOKEN_STR:
             expr = parse_str_literal(parser);
             break;
@@ -372,6 +353,7 @@ static ASTNode* parse_basic_expr(Parser* parser) {
             break;
         default:
             expr = parse_suffixed_expr(parser);
+            /* TODO: Make this parse_suffixed_expr */
     }
 
     return expr;
@@ -383,9 +365,10 @@ static ASTNode* parse_func_call(Parser* parser) {
 }
 
 static ASTNode* parse_suffixed_expr(Parser* parser) {
-    ASTNode* expr = make_node(ASTNODE_SUFFIXED_EXPR);
-    expr->suffixed_expr.primary_expr = parse_primary_expr(parser);
-    expr->suffixed_expr.suffix_list = NULL;
+    INFO("In suffixed expr with %s", token_to_str(parser->curr_token));
+    ASTNode* suffix_expr = make_node(ASTNODE_SUFFIXED_EXPR);
+    suffix_expr->suffixed_expr.primary_expr = parse_primary_expr(parser);
+    suffix_expr->suffixed_expr.suffix_list = NULL;
 
     for(;;) {
         switch(parser->curr_token->kind) {
@@ -393,7 +376,7 @@ static ASTNode* parse_suffixed_expr(Parser* parser) {
                 return parse_func_call(parser);
                 break;
             default:
-                return expr;
+                return suffix_expr;
         }
     }
 }
@@ -474,64 +457,10 @@ static SymbolList* parse_func_params(Parser* parser) {
     return params;
 }
 
-static ASTNode* parse_table_literal(Parser* parser) {
-    ASTNode* node = make_node(ASTNODE_TABLE_LITERAL);
-    TableLiteralExpr* table_literal = calloc(1, sizeof(TableLiteralExpr));
-    table_literal->expr_list = init_ast_node_list();
-    Scope* ti_scope = enter_scope(parser->scope_tracker, node);
-    table_literal->scope = ti_scope;
-
-    while(parser->curr_token->kind != TOKEN_RCURLY) {
-        ASTNode* table_elem = parse_table_element(parser);
-        add_to_ast_node_list(table_literal->expr_list, table_elem);
-
-        if(parser->curr_token->kind == TOKEN_COMMA ||
-           parser->curr_token->kind == TOKEN_SEMICOLON) {
-            advance_parser(parser);
-        }
-    }
-
-    if(!consume_token(parser, TOKEN_RCURLY)) {
-        FAILED_EXPECTATION("RCURLY");
-    }
-
-    memcpy(&node->table_literal, table_literal, sizeof(TableLiteralExpr));
-    free(table_literal);
-    leave_scope(parser->scope_tracker);
-
-    return node;
-}
-
-static ASTNode* parse_table_element(Parser* parser) {
-    ASTNode* node = make_node(ASTNODE_TABLE_ELEMENT);
-    TableElement* elem = calloc(1, sizeof(TableElement));
-
-    if(parser->curr_token->kind == TOKEN_IDENT) {
-        elem->key = parse_symbol(parser, true);
-        if(!consume_token(parser, TOKEN_ASSIGN)) {
-            FAILED_EXPECTATION("ASSIGN");
-        }
-    } else if(parser->curr_token->kind == TOKEN_LBRACKET) {
-        elem->key = parse_expr(parser);
-        if(!consume_token(parser, TOKEN_ASSIGN)) {
-            FAILED_EXPECTATION("ASSIGN");
-        }
-    } else {
-        // list type tables
-        elem->key = NULL;
-    }
-    elem->value = parse_expr(parser);
-    maybe_give_scope_a_name(elem->key, elem->value);
-
-    memcpy(&node->table_elem, elem, sizeof(TableElement));
-    free(elem);
-
-    return node;
-}
-
 static ASTNode* parse_symbol(Parser* parser, bool is_confined_to_curr_scope) {
     Token* ident = consume_token_and_clone(parser, TOKEN_IDENT);
     if(!ident) {
+        INFO("NExt tok is %s", token_to_str(parser->curr_token));
         FAILED_EXPECTATION("IDENT");
     }
 
@@ -595,6 +524,7 @@ static ASTNode* parse_num_literal(Parser* parser) {
     }
 
     num->num_val = value;
+    INFO("Did we come here %f", num->num_val);
     memcpy(&(node->num_literal), num, sizeof(NumLiteral));
     free(num);
     annihilate_token(&num_tok);

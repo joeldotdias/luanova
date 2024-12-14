@@ -205,6 +205,11 @@ static void print_index_expr(IndexExpr* index_expr, size_t indent) {
 }
 
 static void print_suffixed_expr(SuffixedExpr* suffixed_expr, size_t indent) {
+    if(!suffixed_expr->suffix_list) {
+        print_ast_node(suffixed_expr->primary_expr, indent + 1);
+        return;
+    }
+
     INDENTED(indent, COLOR_KEY "SUFFIXED:");
     print_ast_node(suffixed_expr->primary_expr, indent + 1);
 
