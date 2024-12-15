@@ -160,7 +160,7 @@ static void print_return_stmt(ReturnStmt* ret_stmt, size_t indent) {
 }
 
 static void print_expr_stmt(ExprStmt* expr_stmt, size_t indent) {
-    INDENTED(indent, COLOR_KEY "EXPRESSION:");
+    INDENTED(indent, COLOR_KEY "EXPRESSION STMT:");
     if(expr_stmt->var_expr_list != NULL) {
         INDENTED(indent + 1, COLOR_KEY "LHS:");
         for(size_t i = 0; i < expr_stmt->var_expr_list->count; i++) {
@@ -190,12 +190,6 @@ static void print_func_expr(FuncExpr* func_expr, size_t indent) {
 
 static void print_func_call(FuncCall* func_call, size_t indent) {
     INDENTED(indent, COLOR_KEY "FUNCTION CALL:");
-    INDENTED(indent + 1, COLOR_KEY "NAME: " COLOR_NAME "%s", func_call->name);
-
-    if(func_call->prefix) {
-        INDENTED(indent + 1, COLOR_KEY "PREFIX:");
-        print_ast_node(func_call->prefix, indent + 2);
-    }
 
     if(func_call->args) {
         INDENTED(indent + 1, COLOR_KEY "ARGS:");
@@ -240,7 +234,7 @@ static void print_index_expr(IndexExpr* index_expr, size_t indent) {
 
 static void print_suffixed_expr(SuffixedExpr* suffixed_expr, size_t indent) {
     if(!suffixed_expr->suffix_list) {
-        print_ast_node(suffixed_expr->primary_expr, indent + 1);
+        print_ast_node(suffixed_expr->primary_expr, indent);
         return;
     }
 
@@ -399,7 +393,7 @@ static size_t find_escaped_len(const char* str) {
     return extra_chars;
 }
 
-char* node_to_str(ASTNode* node) {
+char* node_to_str(const ASTNode* node) {
     switch(node->kind) {
         case ASTNODE_CHUNK:
             return "ASTNODE_CHUNK";

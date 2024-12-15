@@ -1,3 +1,8 @@
+/* A lot of inspiration (technically just the suffixed expression type but that solved a
+ * lotta problems) for how to structure the types in the AST has been taken from the
+ * ravi-compiler. (https://github.com/dibyendumajumdar/ravi-compiler)
+ */
+
 #ifndef AST_H
 #define AST_H
 
@@ -109,10 +114,11 @@ SymbolList* init_symbol_list();
 void add_to_symbol_list(SymbolList* list, Symbol* symbol);
 void print_symbol_list(const SymbolList* list);
 ASTNodeList* init_ast_node_list();
-void add_to_ast_node_list(ASTNodeList* list, ASTNode* node);
+// void add_to_ast_node_list(ASTNodeList* list, ASTNode* node);
+void add_to_ast_node_list(ASTNodeList** list_ref, ASTNode* node);
 void print_ast_node_list(const ASTNodeList* list);
 void print_ast_node(ASTNode* node, size_t indent);
-char* node_to_str(ASTNode* node);
+char* node_to_str(const ASTNode* node);
 
 struct Scope {
     ASTNode* function; // type FuncExpr
@@ -195,9 +201,8 @@ typedef struct {
 } FuncStmt;
 
 typedef struct {
-    char* name;
-    ASTNode* prefix;
     ASTNodeList* args;
+    const char* method_name; // if it is a method, else NULL
 } FuncCall;
 
 typedef struct {

@@ -1,10 +1,12 @@
+local sum = function(p1, p2, p3)
+	return p1 + p2 + p3
+end
+
 local t = {
 	a = "Hello",
-	[4] = function(b)
-		print(b)
-	end,
+	[4] = 4,
 	["wooahhh"] = function(xyz, abc)
-		print(xyz, abc)
+		sum(xyz, abc, 7)
 	end,
 	"!",
 }

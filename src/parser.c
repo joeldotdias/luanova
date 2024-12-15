@@ -30,7 +30,7 @@ static ASTNode* parse_suffixed_expr(Parser* parser);
 static ASTNode* parse_primary_expr(Parser* parser);
 static ASTNode* parse_func_expr(Parser* parser);
 static SymbolList* parse_func_params(Parser* parser);
-static ASTNode* parse_func_call(Parser* parser);
+static ASTNode* parse_func_call(Parser* parser, const char* method_name);
 static ASTNodeList* parse_func_args(Parser* parser);
 static ASTNode* parse_table_literal(Parser* parser);
 static ASTNode* parse_table_element(Parser* parser);
@@ -107,8 +107,6 @@ static ASTNode* parse_chunk(Parser* parser, TokenKind fail) {
     chunk->stmteez = init_ast_node_list();
 
     ASTNode* stmt = NULL;
-    /* while(parser->curr_token->kind != TOKEN_EOF && parser->curr_token->kind != fail) {
-     */
     // This part is technically the parse_statement function
     while(!fail_tok(parser->curr_token)) {
         if(parser->curr_token->kind == TOKEN_SEMICOLON) {
@@ -136,7 +134,7 @@ static ASTNode* parse_chunk(Parser* parser, TokenKind fail) {
                 stmt = parse_expr_stmt(parser);
         }
 
-        add_to_ast_node_list(chunk->stmteez, stmt);
+        add_to_ast_node_list(&chunk->stmteez, stmt);
     }
 
     if(chunk != NULL) {
@@ -262,11 +260,11 @@ static ASTNode* parse_if_stmt(Parser* parser) {
     advance_parser(parser); // eat IF
 
     ASTNode* cond_then_block = parse_if_cond_then_block(parser);
-    add_to_ast_node_list(if_stmt->if_cond_then_blocks, cond_then_block);
+    add_to_ast_node_list(&if_stmt->if_cond_then_blocks, cond_then_block);
 
     while(consume_token(parser, TOKEN_ELSEIF)) {
         ASTNode* maybe_a_cond_then_block = parse_if_cond_then_block(parser);
-        add_to_ast_node_list(if_stmt->if_cond_then_blocks, maybe_a_cond_then_block);
+        add_to_ast_node_list(&if_stmt->if_cond_then_blocks, maybe_a_cond_then_block);
     }
 
     if(consume_token(parser, TOKEN_ELSE)) {
@@ -307,11 +305,11 @@ static ASTNode* parse_expr_stmt(Parser* parser) {
 
     ASTNodeList* curr_list = init_ast_node_list();
     ASTNode* maybe_suffixed_expr = parse_suffixed_expr(parser);
-    add_to_ast_node_list(curr_list, maybe_suffixed_expr);
+    add_to_ast_node_list(&curr_list, maybe_suffixed_expr);
 
     while(consume_token(parser, TOKEN_COMMA)) {
         ASTNode* maybe_still_a_suffixed_expr = parse_suffixed_expr(parser);
-        add_to_ast_node_list(curr_list, maybe_still_a_suffixed_expr);
+        add_to_ast_node_list(&curr_list, maybe_still_a_suffixed_expr);
     }
 
     if(consume_token(parser, TOKEN_ASSIGN)) {
@@ -350,7 +348,7 @@ static ASTNodeList* parse_assignment_rhs(Parser* parser, size_t lhs_count) {
         if(!expr) {
             FATAL("Couldn't parse expression on rhs");
         }
-        add_to_ast_node_list(exprs, expr);
+        add_to_ast_node_list(&exprs, expr);
 
         if(parser->curr_token->kind == TOKEN_COMMA) {
             advance_parser(parser);
@@ -447,21 +445,25 @@ static ASTNode* parse_basic_expr(Parser* parser) {
     return expr;
 }
 
-static ASTNode* parse_func_call(Parser* parser) {
-    ASTNode* func_call = make_node(ASTNODE_FUNC_CALL_EXPR);
-    FATAL("In func call");
-}
-
 static ASTNode* parse_suffixed_expr(Parser* parser) {
     ASTNode* expr = make_node(ASTNODE_SUFFIXED_EXPR);
     expr->suffixed_expr.primary_expr = parse_primary_expr(parser);
     expr->suffixed_expr.suffix_list = NULL;
 
-    for(;;) {
+    while(true) {
         switch(parser->curr_token->kind) {
             case TOKEN_LPAREN:
-                return parse_func_call(parser);
-                break;
+                {
+                    ASTNode* func_call = parse_func_call(parser, NULL);
+                    add_to_ast_node_list(&expr->suffixed_expr.suffix_list, func_call);
+                    break;
+                }
+            case TOKEN_LBRACKET:
+                {
+                    ASTNode* index = parse_index_expr(parser);
+                    add_to_ast_node_list(&expr->suffixed_expr.suffix_list, index);
+                    break;
+                }
             default:
                 return expr;
         }
@@ -544,16 +546,50 @@ static SymbolList* parse_func_params(Parser* parser) {
     return params;
 }
 
+static ASTNode* parse_func_call(Parser* parser, const char* method_name) {
+    if(!consume_token(parser, TOKEN_LPAREN)) {
+        FAILED_EXPECTATION("LPAREN");
+    }
+
+    ASTNode* func_call_expr = make_node(ASTNODE_FUNC_CALL_EXPR);
+    func_call_expr->func_call.method_name = method_name;
+    func_call_expr->func_call.args = NULL;
+
+    if(!consume_token(parser, TOKEN_RPAREN)) {
+        func_call_expr->func_call.args = parse_func_args(parser);
+        if(!consume_token(parser, TOKEN_RPAREN)) {
+            FAILED_EXPECTATION("LPAREN");
+        }
+    }
+
+    return func_call_expr;
+}
+
+static ASTNodeList* parse_func_args(Parser* parser) {
+    ASTNodeList* args = init_ast_node_list();
+
+    while(parser->curr_token->kind != TOKEN_RPAREN) {
+        ASTNode* arg = parse_expr(parser);
+        add_to_ast_node_list(&args, arg);
+
+        if(parser->curr_token->kind == TOKEN_COMMA) {
+            advance_parser(parser);
+        }
+    }
+
+    return args;
+}
+
 static ASTNode* parse_table_literal(Parser* parser) {
     ASTNode* node = make_node(ASTNODE_TABLE_LITERAL);
     TableLiteralExpr* table_literal = calloc(1, sizeof(TableLiteralExpr));
-    table_literal->expr_list = init_ast_node_list();
-    Scope* ti_scope = enter_scope(parser->scope_tracker, node);
-    table_literal->scope = ti_scope;
+    /* table_literal->expr_list = init_ast_node_list(); */
+    Scope* tl_scope = enter_scope(parser->scope_tracker, node);
+    table_literal->scope = tl_scope;
 
     while(parser->curr_token->kind != TOKEN_RCURLY) {
         ASTNode* table_elem = parse_table_element(parser);
-        add_to_ast_node_list(table_literal->expr_list, table_elem);
+        add_to_ast_node_list(&table_literal->expr_list, table_elem);
 
         if(parser->curr_token->kind == TOKEN_COMMA ||
            parser->curr_token->kind == TOKEN_SEMICOLON) {
@@ -582,7 +618,7 @@ static ASTNode* parse_table_element(Parser* parser) {
             FAILED_EXPECTATION("ASSIGN");
         }
     } else if(parser->curr_token->kind == TOKEN_LBRACKET) {
-        elem->key = parse_expr(parser);
+        elem->key = parse_index_expr(parser);
         if(!consume_token(parser, TOKEN_ASSIGN)) {
             FAILED_EXPECTATION("ASSIGN");
         }
@@ -591,12 +627,28 @@ static ASTNode* parse_table_element(Parser* parser) {
         elem->key = NULL;
     }
     elem->value = parse_expr(parser);
-    maybe_give_scope_a_name(elem->key, elem->value);
+    if(elem->key) {
+        maybe_give_scope_a_name(elem->key, elem->value);
+    }
 
     memcpy(&node->table_elem, elem, sizeof(TableElement));
     free(elem);
 
     return node;
+}
+
+static ASTNode* parse_index_expr(Parser* parser) {
+    /* FATAL("In index expr %s", token_to_str(parser->curr_token)); */
+    if(!consume_token(parser, TOKEN_LBRACKET)) {
+        FAILED_EXPECTATION("LBRACKET");
+    }
+    ASTNode* index = make_node(ASTNODE_INDEX_EXPR);
+    index->index_expr.expr = parse_expr(parser);
+    if(!consume_token(parser, TOKEN_RBRACKET)) {
+        FAILED_EXPECTATION("RBRACKET");
+    }
+
+    return index;
 }
 
 static ASTNode* parse_symbol(Parser* parser, bool is_confined_to_curr_scope) {

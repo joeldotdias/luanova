@@ -12,7 +12,9 @@ elseif a == 3 then
 elseif a == 1 then
 	a = 10
 else
-	a = 17
+	local else_var = a
 end
+
+b(a, c)
 
 c, a = "Bye", 19 + (9 - 4 * (3 - 1)) * c

@@ -69,7 +69,12 @@ ASTNodeList* init_ast_node_list() {
     return list;
 }
 
-void add_to_ast_node_list(ASTNodeList* list, ASTNode* node) {
+void add_to_ast_node_list(ASTNodeList** list_ref, ASTNode* node) {
+    if(!(*list_ref)) {
+        *list_ref = init_ast_node_list();
+    }
+    ASTNodeList* list = *list_ref;
+
     if(list->count >= list->capacity) {
         size_t new_capacity = list->capacity += 2;
         ASTNode** new_nodes = realloc(list->nodes, new_capacity * sizeof(ASTNode*));
