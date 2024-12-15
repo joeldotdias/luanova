@@ -11,8 +11,10 @@
 static ASTNode* parse_chunk(Parser* parser, TokenKind fail);
 
 /* statements */
+static ASTNode* parse_stmt(Parser* parser);
 static ASTNode* parse_local_assignment(Parser* parser);
 static ASTNode* parse_local_function_stmt(Parser* parser);
+static ASTNode* parse_if_stmt(Parser* parser);
 static ASTNode* parse_return(Parser* parser);
 static ASTNode* parse_expr_stmt(Parser* parser);
 static SymbolList* parse_assignment_lhs(Parser* parser);
@@ -54,6 +56,7 @@ static PrefixOperator prefix_op_from_tok(Token* tok);
 static ASTNode* make_node(NodeKind kind);
 static Token* consume_token_and_clone(Parser* parser, TokenKind expected);
 static bool consume_token(Parser* parser, TokenKind expected);
+static bool fail_tok(Token* token);
 static bool expect_token(Parser* parser, TokenKind expected);
 static void advance_parser(Parser* parser);
 
@@ -104,11 +107,21 @@ static ASTNode* parse_chunk(Parser* parser, TokenKind fail) {
     chunk->stmteez = init_ast_node_list();
 
     ASTNode* stmt = NULL;
+    /* while(parser->curr_token->kind != TOKEN_EOF && parser->curr_token->kind != fail) {
+     */
     // This part is technically the parse_statement function
-    while(parser->curr_token->kind != TOKEN_EOF && parser->curr_token->kind != fail) {
+    while(!fail_tok(parser->curr_token)) {
+        if(parser->curr_token->kind == TOKEN_SEMICOLON) {
+            advance_parser(parser);
+            continue;
+        }
+
         switch(parser->curr_token->kind) {
             case TOKEN_LOCAL:
                 stmt = parse_local_assignment(parser);
+                break;
+            case TOKEN_IF:
+                stmt = parse_if_stmt(parser);
                 break;
             case TOKEN_RETURN:
                 stmt = parse_return(parser);
@@ -212,6 +225,64 @@ static ASTNode* parse_local_function_stmt(Parser* parser) {
 
     memcpy(&node->func_stmt, func_stmt, sizeof(FuncStmt));
     free(func_stmt);
+
+    return node;
+}
+
+static ASTNode* parse_condition(Parser* parser) {
+    ASTNode* cond = parse_expr(parser);
+    if(!cond) {
+        FATAL("Expected condition");
+    }
+
+    return cond;
+}
+
+static ASTNode* parse_if_cond_then_block(Parser* parser) {
+    ASTNode* block = make_node(ASTNODE_COND_THEN_BLOCK);
+    block->cond_then_block.cond = parse_condition(parser);
+
+    if(!consume_token(parser, TOKEN_THEN)) {
+        FAILED_EXPECTATION("THEN");
+    }
+
+    block->cond_then_block.scope = enter_scope(parser->scope_tracker, block);
+    block->cond_then_block.scope->name = "_COND";
+    block->cond_then_block.body = parse_chunk(parser, TOKEN_END);
+
+    leave_scope(parser->scope_tracker);
+
+    return block;
+}
+
+static ASTNode* parse_if_stmt(Parser* parser) {
+    ASTNode* node = make_node(ASTNODE_IF_STMT);
+    IfStmt* if_stmt = calloc(1, sizeof(IfStmt));
+    if_stmt->if_cond_then_blocks = init_ast_node_list();
+    advance_parser(parser); // eat IF
+
+    ASTNode* cond_then_block = parse_if_cond_then_block(parser);
+    add_to_ast_node_list(if_stmt->if_cond_then_blocks, cond_then_block);
+
+    while(consume_token(parser, TOKEN_ELSEIF)) {
+        ASTNode* maybe_a_cond_then_block = parse_if_cond_then_block(parser);
+        add_to_ast_node_list(if_stmt->if_cond_then_blocks, maybe_a_cond_then_block);
+    }
+
+    if(consume_token(parser, TOKEN_ELSE)) {
+        ASTNode* else_block = make_node(ASTNODE_CHUNK);
+        if_stmt->else_scope = enter_scope(parser->scope_tracker, else_block);
+        if_stmt->else_scope->name = "_ELSE";
+        if_stmt->else_body = parse_chunk(parser, TOKEN_END);
+        leave_scope(parser->scope_tracker);
+    }
+
+    if(!consume_token(parser, TOKEN_END)) {
+        FAILED_EXPECTATION("END");
+    }
+
+    memcpy(&node->if_stmt, if_stmt, sizeof(IfStmt));
+    free(if_stmt);
 
     return node;
 }
@@ -359,7 +430,6 @@ static ASTNode* parse_basic_expr(Parser* parser) {
         case TOKEN_LPAREN:
             advance_parser(parser);
             expr = parse_expr(parser);
-            print_ast_node(expr, 0);
             if(!consume_token(parser, TOKEN_RPAREN)) {
                 FATAL("Unbalanced parens");
             }
@@ -414,7 +484,7 @@ static ASTNode* parse_primary_expr(Parser* parser) {
             break;
 
         default:
-            FATAL("Shoudln' have come here. Received %s",
+            FATAL("Shouldn't have come here. Received %s",
                   token_to_str(parser->curr_token));
     }
 
@@ -803,6 +873,18 @@ static bool consume_token(Parser* parser, TokenKind expected) {
     }
     advance_parser(parser);
     return true;
+}
+
+static bool fail_tok(Token* token) {
+    switch(token->kind) {
+        case TOKEN_END:
+        case TOKEN_ELSEIF:
+        case TOKEN_ELSE:
+        case TOKEN_EOF:
+            return true;
+        default:
+            return false;
+    }
 }
 
 static bool expect_token(Parser* parser, TokenKind expected) {

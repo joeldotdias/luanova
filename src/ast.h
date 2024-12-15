@@ -21,6 +21,7 @@ typedef enum {
     // statements
     ASTNODE_LOCAL_VAR_DECL,
     ASTNODE_IF_STMT,
+    ASTNODE_COND_THEN_BLOCK,
     ASTNODE_DO_STMT,
     ASTNODE_WHILE_STMT,
     ASTNODE_FOR_NUMERIC_STMT,
@@ -142,13 +143,16 @@ typedef struct {
 } RepeatStmt;
 
 typedef struct {
-    ASTNode* cond;
-    ASTNode* then_block;
-    ASTNode** elseif_conds;
-    ASTNode** elseif_blocks;
-    size_t elseif_count;
-    ASTNode* else_block;
+    ASTNodeList* if_cond_then_blocks; // type -> CondThenBlock
+    Scope* else_scope;
+    ASTNode* else_body; // type -> chunk
 } IfStmt;
+
+typedef struct {
+    ASTNode* cond;
+    ASTNode* body; // type -> chunk
+    Scope* scope;
+} CondThenBlock;
 
 typedef struct {
     char* var;
@@ -176,9 +180,9 @@ typedef struct {
 } ReassignExpr;
 
 typedef struct {
-    Scope* scope;
     SymbolList* params;
     ASTNode* body;
+    Scope* scope;
     bool is_method;
     bool is_local;
 } FuncExpr;
@@ -286,6 +290,7 @@ struct ASTNode {
         WhileStmt while_stmt;
         RepeatStmt reapeat_stmt;
         IfStmt if_stmt;
+        CondThenBlock cond_then_block;
         ForNumeric for_numeric;
         ForGeneric for_generic;
         FuncStmt func_stmt;

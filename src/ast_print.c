@@ -15,10 +15,12 @@
 static void print_chunk(Chunk* chunk, size_t indent);
 static void print_assignment(LocalAssignment* asgmt, size_t indent);
 static void print_func_stmt(FuncStmt* func_stmt, size_t indent);
-static void print_func_expr(FuncExpr* func_expr, size_t indent);
+static void print_if_stmt(IfStmt* if_stmt, size_t indent);
 static void print_return_stmt(ReturnStmt* ret_stmt, size_t indent);
 static void print_expr_stmt(ExprStmt* expr_stmt, size_t indent);
+static void print_func_expr(FuncExpr* func_expr, size_t indent);
 static void print_func_call(FuncCall* func_call, size_t indent);
+static void print_cond_then_block(CondThenBlock* block, size_t indent);
 static void print_table_literal(TableLiteralExpr* table, size_t indent);
 static void print_table_element(TableElement* elem, size_t indent);
 static void print_index_expr(IndexExpr* index_expr, size_t indent);
@@ -58,6 +60,9 @@ void print_ast_node(ASTNode* node, size_t indent) {
         case ASTNODE_FUNC_STMT:
             print_func_stmt(&node->func_stmt, indent);
             break;
+        case ASTNODE_IF_STMT:
+            print_if_stmt(&node->if_stmt, indent);
+            break;
         case ASTNODE_RETURN_STMT:
             print_return_stmt(&node->return_stmt, indent);
             break;
@@ -66,6 +71,9 @@ void print_ast_node(ASTNode* node, size_t indent) {
             break;
         case ASTNODE_FUNC_EXPR:
             print_func_expr(&node->func_expr, indent);
+            break;
+        case ASTNODE_COND_THEN_BLOCK:
+            print_cond_then_block(&node->cond_then_block, indent);
             break;
         case ASTNODE_FUNC_CALL_EXPR:
             print_func_call(&node->func_call, indent);
@@ -129,6 +137,23 @@ static void print_func_stmt(FuncStmt* func_stmt, size_t indent) {
     print_ast_node(func_stmt->func_expr, indent + 1);
 }
 
+static void print_if_stmt(IfStmt* if_stmt, size_t indent) {
+    INDENTED(indent, COLOR_KEY "CONDITIONAL:");
+    for(size_t i = 0; i < if_stmt->if_cond_then_blocks->count; i++) {
+        if(i == 0) {
+            INDENTED(indent + 1, COLOR_KEY "IF:");
+        } else {
+            INDENTED(indent + 1, COLOR_KEY "ELSE IF:");
+        }
+        print_ast_node(if_stmt->if_cond_then_blocks->nodes[i], indent + 2);
+    }
+
+    if(if_stmt->else_body) {
+        INDENTED(indent + 1, COLOR_KEY "ELSE:");
+        print_ast_node(if_stmt->else_body, indent + 2);
+    }
+}
+
 static void print_return_stmt(ReturnStmt* ret_stmt, size_t indent) {
     INDENTED(indent, COLOR_KEY "RETURN:");
     print_ast_node(ret_stmt->return_val, indent + 1);
@@ -177,6 +202,15 @@ static void print_func_call(FuncCall* func_call, size_t indent) {
         for(size_t i = 0; i < func_call->args->count; i++) {
             print_ast_node(func_call->args->nodes[i], indent + 2);
         }
+    }
+}
+
+static void print_cond_then_block(CondThenBlock* block, size_t indent) {
+    INDENTED(indent, COLOR_KEY "COND:");
+    print_ast_node(block->cond, indent + 1);
+    INDENTED(indent, COLOR_KEY "BODY:");
+    for(size_t i = 0; i < block->body->chunk.stmteez->count; i++) {
+        print_ast_node(block->body->chunk.stmteez->nodes[i], indent + 2);
     }
 }
 
@@ -411,6 +445,8 @@ char* node_to_str(ASTNode* node) {
             return "ASTNODE_STR_LITERAL";
         case ASTNODE_INDEX_EXPR:
             return "ASTNODE_INDEX_EXPR";
+        case ASTNODE_COND_THEN_BLOCK:
+            return "ASTNODE_COND_THEN_BLOCK";
         case ASTNODE_VARARG_EXPR:
             return "ASTNODE_VARARG_EXPR";
         case ASTNODE_FUNC_EXPR:

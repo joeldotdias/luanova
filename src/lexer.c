@@ -104,6 +104,7 @@ Token* next_token(Lexer* lexer) {
 
         case '=':
             if(peek(lexer) == '=') {
+                advance_lexer(lexer);
                 token = make_sym_token(TOKEN_EQ);
             } else {
                 token = make_sym_token(TOKEN_ASSIGN);
@@ -111,6 +112,7 @@ Token* next_token(Lexer* lexer) {
             break;
         case '~':
             if(peek(lexer) == '=') {
+                advance_lexer(lexer);
                 token = make_sym_token(TOKEN_NOT_EQ);
             } else {
                 token = make_value_token(TOKEN_ILLEGAL, "~");
