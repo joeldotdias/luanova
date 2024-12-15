@@ -59,9 +59,11 @@ Token* next_token(Lexer* lexer) {
             break;
         case '.':
             if(peek(lexer) == '.') {
-                token = make_sym_token(TOKEN_CONCAT);
-            } else if(peek_peek(lexer)) {
-                token = make_sym_token(TOKEN_DOTS);
+                if(peek_peek(lexer) == '.') {
+                    token = make_sym_token(TOKEN_DOTS);
+                } else {
+                    token = make_sym_token(TOKEN_CONCAT);
+                }
             } else {
                 token = make_sym_token(TOKEN_DOT);
             }

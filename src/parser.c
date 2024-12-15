@@ -35,6 +35,7 @@ static ASTNodeList* parse_func_args(Parser* parser);
 static ASTNode* parse_table_literal(Parser* parser);
 static ASTNode* parse_table_element(Parser* parser);
 static ASTNode* parse_index_expr(Parser* parser);
+static ASTNode* parse_field_selector(Parser* parser);
 static ASTNode* parse_symbol(Parser* parser, bool is_confined_to_curr_scope);
 static ASTNode* parse_str_literal(Parser* parser);
 static ASTNode* parse_num_literal(Parser* parser);
@@ -56,6 +57,7 @@ static PrefixOperator prefix_op_from_tok(Token* tok);
 static ASTNode* make_node(NodeKind kind);
 static Token* consume_token_and_clone(Parser* parser, TokenKind expected);
 static bool consume_token(Parser* parser, TokenKind expected);
+static ASTNode* str_from_ident(Token* ident);
 static bool fail_tok(Token* token);
 static bool expect_token(Parser* parser, TokenKind expected);
 static void advance_parser(Parser* parser);
@@ -74,7 +76,7 @@ Parser* init_parser(Lexer* lexer) {
     ScopeTracker* scope_tracker = calloc(1, sizeof(ScopeTracker));
     Scope* global_scope = calloc(1, sizeof(Scope));
     global_scope->parent = NULL;
-    global_scope->function = NULL;
+    global_scope->block = NULL;
     global_scope->must_be_closed = false;
     global_scope->name = "_MAIN";
     global_scope->symbol_lookup = init_symbol_list();
@@ -464,6 +466,21 @@ static ASTNode* parse_suffixed_expr(Parser* parser) {
                     add_to_ast_node_list(&expr->suffixed_expr.suffix_list, index);
                     break;
                 }
+            case TOKEN_DOT:
+                {
+                    ASTNode* f_sel = parse_field_selector(parser);
+                    add_to_ast_node_list(&expr->suffixed_expr.suffix_list, f_sel);
+                    break;
+                }
+            case TOKEN_COLON:
+                {
+                    advance_parser(parser);
+                    Token* ident = consume_token_and_clone(parser, TOKEN_IDENT);
+                    char* method_name = strdup(ident->value);
+                    ASTNode* func_call = parse_func_call(parser, method_name);
+                    add_to_ast_node_list(&expr->suffixed_expr.suffix_list, func_call);
+                    break;
+                }
             default:
                 return expr;
         }
@@ -583,7 +600,6 @@ static ASTNodeList* parse_func_args(Parser* parser) {
 static ASTNode* parse_table_literal(Parser* parser) {
     ASTNode* node = make_node(ASTNODE_TABLE_LITERAL);
     TableLiteralExpr* table_literal = calloc(1, sizeof(TableLiteralExpr));
-    /* table_literal->expr_list = init_ast_node_list(); */
     Scope* tl_scope = enter_scope(parser->scope_tracker, node);
     table_literal->scope = tl_scope;
 
@@ -613,9 +629,11 @@ static ASTNode* parse_table_element(Parser* parser) {
     TableElement* elem = calloc(1, sizeof(TableElement));
 
     if(parser->curr_token->kind == TOKEN_IDENT) {
-        elem->key = parse_symbol(parser, true);
-        if(!consume_token(parser, TOKEN_ASSIGN)) {
-            FAILED_EXPECTATION("ASSIGN");
+        if(parser->peeked_token->kind == TOKEN_ASSIGN) {
+            elem->key = parse_symbol(parser, true);
+            if(!consume_token(parser, TOKEN_ASSIGN)) {
+                FAILED_EXPECTATION("ASSIGN");
+            }
         }
     } else if(parser->curr_token->kind == TOKEN_LBRACKET) {
         elem->key = parse_index_expr(parser);
@@ -649,6 +667,22 @@ static ASTNode* parse_index_expr(Parser* parser) {
     }
 
     return index;
+}
+
+static ASTNode* parse_field_selector(Parser* parser) {
+    ASTNode* fl_sel = make_node(ASTNODE_FIELD_SELECTOR);
+    if(!consume_token(parser, TOKEN_DOT)) {
+        FAILED_EXPECTATION("DOT");
+    }
+
+    Token* ident = consume_token_and_clone(parser, TOKEN_IDENT);
+    if(!ident) {
+        FAILED_EXPECTATION("IDENT");
+    }
+    fl_sel->index_expr.expr = str_from_ident(ident);
+    free(ident);
+
+    return fl_sel;
 }
 
 static ASTNode* parse_symbol(Parser* parser, bool is_confined_to_curr_scope) {
@@ -780,7 +814,7 @@ static Symbol* look_for_symbol(SymbolList* symbol_lookup, const char* name) {
 
 static Scope* create_scope(Scope* parent, ASTNode* curr_function) {
     Scope* scope = calloc(1, sizeof(Scope));
-    scope->function = curr_function;
+    scope->block = curr_function;
     scope->parent = parent;
     scope->symbol_lookup = init_symbol_list();
     scope->must_be_closed = false;
@@ -904,6 +938,12 @@ static InfixOperator infix_op_from_tok(Token* tok) {
     }
 }
 
+static ASTNode* str_from_ident(Token* ident) {
+    ASTNode* str_node = make_node(ASTNODE_STR_LITERAL);
+    str_node->str_literal.str_val = strdup(ident->value);
+    return str_node;
+}
+
 static Token* consume_token_and_clone(Parser* parser, TokenKind expected) {
     if(parser->curr_token->kind != expected) {
         return NULL;
@@ -983,7 +1023,10 @@ static char* get_name_val_from_node(const ASTNode* node, bool* needs_free) {
         case ASTNODE_SYMBOL:
             return node->symbol.name;
         case ASTNODE_STR_LITERAL:
-            return node->str_literal.str_val;
+            {
+                char* name = strdup(node->str_literal.str_val);
+                return name;
+            }
         case ASTNODE_NUM_LITERAL:
             {
                 char* buf = malloc(50 * sizeof(char));

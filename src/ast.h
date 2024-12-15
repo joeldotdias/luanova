@@ -57,7 +57,7 @@ typedef enum {
     // variable stuff
     ASTNODE_SYMBOL,
     ASTNODE_INDEXED_VAR,
-    ASTNODE_FIELD_VAR,
+    ASTNODE_FIELD_SELECTOR,
 
     // table related
     ASTNODE_TABLE_LITERAL,
@@ -121,9 +121,9 @@ void print_ast_node(ASTNode* node, size_t indent);
 char* node_to_str(const ASTNode* node);
 
 struct Scope {
-    ASTNode* function; // type FuncExpr
-    Scope* parent;     // NULL if belongs to main chunk
-    char* name;        // really stupid
+    ASTNode* block;
+    Scope* parent; // NULL if belongs to main chunk
+    char* name;    // really stupid
     SymbolList* symbol_lookup;
     bool must_be_closed; // if vars are in a closure, maybe move them to the heap
 };

@@ -24,6 +24,7 @@ static void print_cond_then_block(CondThenBlock* block, size_t indent);
 static void print_table_literal(TableLiteralExpr* table, size_t indent);
 static void print_table_element(TableElement* elem, size_t indent);
 static void print_index_expr(IndexExpr* index_expr, size_t indent);
+static void print_field_selector(IndexExpr* index_expr, size_t indent);
 static void print_suffixed_expr(SuffixedExpr* suffixed_expr, size_t indent);
 static void print_unary_expr(UnaryExpr* expr, size_t indent);
 static void print_binary_expr(BinaryExpr* expr, size_t indent);
@@ -86,6 +87,9 @@ void print_ast_node(ASTNode* node, size_t indent) {
             break;
         case ASTNODE_INDEX_EXPR:
             print_index_expr(&node->index_expr, indent);
+            break;
+        case ASTNODE_FIELD_SELECTOR:
+            print_field_selector(&node->index_expr, indent);
             break;
         case ASTNODE_SUFFIXED_EXPR:
             print_suffixed_expr(&node->suffixed_expr, indent);
@@ -190,6 +194,10 @@ static void print_func_expr(FuncExpr* func_expr, size_t indent) {
 
 static void print_func_call(FuncCall* func_call, size_t indent) {
     INDENTED(indent, COLOR_KEY "FUNCTION CALL:");
+    if(func_call->method_name) {
+        INDENTED(indent + 1, COLOR_KEY "METHOD: " COLOR_LITERAL "%s",
+                 func_call->method_name);
+    }
 
     if(func_call->args) {
         INDENTED(indent + 1, COLOR_KEY "ARGS:");
@@ -230,6 +238,11 @@ static void print_table_element(TableElement* elem, size_t indent) {
 static void print_index_expr(IndexExpr* index_expr, size_t indent) {
     INDENTED(indent, COLOR_KEY "INDEX:");
     print_ast_node(index_expr->expr, indent + 1);
+}
+
+static void print_field_selector(IndexExpr* index_expr, size_t indent) {
+    INDENTED(indent, COLOR_KEY "FIELD: " COLOR_LITERAL "%s",
+             index_expr->expr->str_literal.str_val);
 }
 
 static void print_suffixed_expr(SuffixedExpr* suffixed_expr, size_t indent) {
@@ -458,8 +471,8 @@ char* node_to_str(const ASTNode* node) {
             return "ASTNODE_SYMBOL";
         case ASTNODE_INDEXED_VAR:
             return "ASTNODE_INDEXED_VAR";
-        case ASTNODE_FIELD_VAR:
-            return "ASTNODE_FIELD_VAR";
+        case ASTNODE_FIELD_SELECTOR:
+            return "ASTNODE_FIELD_SELECTOR";
 
         // table related
         case ASTNODE_TABLE_LITERAL:
