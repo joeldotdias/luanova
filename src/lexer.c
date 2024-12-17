@@ -60,8 +60,11 @@ Token* next_token(Lexer* lexer) {
         case '.':
             if(peek(lexer) == '.') {
                 if(peek_peek(lexer) == '.') {
+                    advance_lexer(lexer);
+                    advance_lexer(lexer);
                     token = make_sym_token(TOKEN_DOTS);
                 } else {
+                    advance_lexer(lexer);
                     token = make_sym_token(TOKEN_CONCAT);
                 }
             } else {

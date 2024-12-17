@@ -114,7 +114,6 @@ SymbolList* init_symbol_list();
 void add_to_symbol_list(SymbolList* list, Symbol* symbol);
 void print_symbol_list(const SymbolList* list);
 ASTNodeList* init_ast_node_list();
-// void add_to_ast_node_list(ASTNodeList* list, ASTNode* node);
 void add_to_ast_node_list(ASTNodeList** list_ref, ASTNode* node);
 void print_ast_node_list(const ASTNodeList* list);
 void print_ast_node(ASTNode* node, size_t indent);
@@ -140,7 +139,8 @@ typedef struct {
 
 typedef struct {
     ASTNode* cond;
-    ASTNode* body;
+    ASTNode* body; // type -> chunk
+    Scope* while_scope;
 } WhileStmt;
 
 typedef struct {
@@ -161,18 +161,19 @@ typedef struct {
 } CondThenBlock;
 
 typedef struct {
-    char* var;
+    ASTNode* loop_var; // type -> symbol
     ASTNode* start;
     ASTNode* end;
     ASTNode* step;
-    ASTNode* body;
-} ForNumeric;
-
+    ASTNode* body; // type -> chunk
+    Scope* for_scope;
+} ForStmt;
+/*
 typedef struct {
     ASTNode* name_list;
     ASTNode* expr_list;
     ASTNode* body;
-} ForGeneric;
+} ForGeneric; */
 
 typedef struct {
     ASTNodeList* var_expr_list;
@@ -220,11 +221,6 @@ struct Symbol {
         SYM_LABEL,
     } symbol_kind;
 };
-
-// typedef struct {
-//     ASTNode* prefix;
-//     ASTNode* index;
-// } IndexedVar;
 
 typedef struct {
     ASTNode* expr;
@@ -293,11 +289,9 @@ struct ASTNode {
         Chunk chunk;
         LocalAssignment assignment;
         WhileStmt while_stmt;
-        RepeatStmt reapeat_stmt;
         IfStmt if_stmt;
         CondThenBlock cond_then_block;
-        ForNumeric for_numeric;
-        ForGeneric for_generic;
+        ForStmt for_stmt;
         FuncStmt func_stmt;
         FuncExpr func_expr;
         FuncCall func_call;

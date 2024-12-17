@@ -16,6 +16,8 @@ static void print_chunk(Chunk* chunk, size_t indent);
 static void print_assignment(LocalAssignment* asgmt, size_t indent);
 static void print_func_stmt(FuncStmt* func_stmt, size_t indent);
 static void print_if_stmt(IfStmt* if_stmt, size_t indent);
+static void print_while_stmt(WhileStmt* while_stmt, size_t indent);
+static void print_for_stmt(ForStmt* for_stmt, size_t indent);
 static void print_return_stmt(ReturnStmt* ret_stmt, size_t indent);
 static void print_expr_stmt(ExprStmt* expr_stmt, size_t indent);
 static void print_func_expr(FuncExpr* func_expr, size_t indent);
@@ -63,6 +65,12 @@ void print_ast_node(ASTNode* node, size_t indent) {
             break;
         case ASTNODE_IF_STMT:
             print_if_stmt(&node->if_stmt, indent);
+            break;
+        case ASTNODE_WHILE_STMT:
+            print_while_stmt(&node->while_stmt, indent);
+            break;
+        case ASTNODE_FOR_NUMERIC_STMT:
+            print_for_stmt(&node->for_stmt, indent);
             break;
         case ASTNODE_RETURN_STMT:
             print_return_stmt(&node->return_stmt, indent);
@@ -156,6 +164,29 @@ static void print_if_stmt(IfStmt* if_stmt, size_t indent) {
         INDENTED(indent + 1, COLOR_KEY "ELSE:");
         print_ast_node(if_stmt->else_body, indent + 2);
     }
+}
+
+static void print_while_stmt(WhileStmt* while_stmt, size_t indent) {
+    INDENTED(indent, COLOR_KEY "WHILE:");
+    INDENTED(indent + 1, COLOR_KEY "COND:");
+    print_ast_node(while_stmt->cond, indent + 2);
+    INDENTED(indent + 1, COLOR_KEY "BODY:");
+    print_ast_node(while_stmt->body, indent + 2);
+}
+
+static void print_for_stmt(ForStmt* for_stmt, size_t indent) {
+    INDENTED(indent, COLOR_KEY "FOR:");
+    INDENTED(indent + 1, COLOR_KEY "START:");
+    print_ast_node(for_stmt->start, indent + 2);
+    INDENTED(indent + 1, COLOR_KEY "END:");
+    print_ast_node(for_stmt->end, indent + 2);
+    if(for_stmt->step) {
+        INDENTED(indent + 1, COLOR_KEY "STEP:");
+        print_ast_node(for_stmt->step, indent + 2);
+    }
+
+    INDENTED(indent + 1, COLOR_KEY "BODY:");
+    print_ast_node(for_stmt->body, indent + 2);
 }
 
 static void print_return_stmt(ReturnStmt* ret_stmt, size_t indent) {

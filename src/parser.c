@@ -8,14 +8,15 @@
 #include "shared.h"
 
 /* top level */
-static ASTNode* parse_chunk(Parser* parser, TokenKind fail);
+static ASTNode* parse_chunk(Parser* parser);
 
 /* statements */
-static ASTNode* parse_stmt(Parser* parser);
 static ASTNode* parse_local_assignment(Parser* parser);
 static ASTNode* parse_local_function_stmt(Parser* parser);
 static ASTNode* parse_if_stmt(Parser* parser);
-static ASTNode* parse_return(Parser* parser);
+static ASTNode* parse_while_stmt(Parser* parser);
+static ASTNode* parse_for_stmt(Parser* parser);
+static ASTNode* parse_return_stmt(Parser* parser);
 static ASTNode* parse_expr_stmt(Parser* parser);
 static SymbolList* parse_assignment_lhs(Parser* parser);
 static ASTNodeList* parse_assignment_rhs(Parser* parser, size_t lhs_count);
@@ -30,6 +31,7 @@ static ASTNode* parse_suffixed_expr(Parser* parser);
 static ASTNode* parse_primary_expr(Parser* parser);
 static ASTNode* parse_func_expr(Parser* parser);
 static SymbolList* parse_func_params(Parser* parser);
+static ASTNode* parse_cond_then_block(Parser* parser);
 static ASTNode* parse_func_call(Parser* parser, const char* method_name);
 static ASTNodeList* parse_func_args(Parser* parser);
 static ASTNode* parse_table_literal(Parser* parser);
@@ -41,7 +43,7 @@ static ASTNode* parse_str_literal(Parser* parser);
 static ASTNode* parse_num_literal(Parser* parser);
 
 /* scope tracking */
-static Scope* enter_scope(ScopeTracker* tracker, ASTNode* curr_function);
+static Scope* enter_scope(ScopeTracker* tracker, ASTNode* curr_block);
 static void leave_scope(ScopeTracker* tracker);
 static Symbol* resolve_symbol(Scope* curr_scope, const char* name);
 static void add_symbol_to_scope(Scope* scope, Symbol* symbol);
@@ -97,12 +99,13 @@ Parser* init_parser(Lexer* lexer) {
 */
 
 ASTNode* parse(Parser* parser) {
-    ASTNode* chunk = parse_chunk(parser, TOKEN_EOF);
+    ASTNode* chunk = parse_chunk(parser);
     return chunk;
 }
 
 // fail is the token at which we stop processing the chunk
-static ASTNode* parse_chunk(Parser* parser, TokenKind fail) {
+/* static ASTNode* parse_chunk(Parser* parser, TokenKind fail) { */
+static ASTNode* parse_chunk(Parser* parser) {
     ASTNode* node = make_node(ASTNODE_CHUNK);
 
     Chunk* chunk = calloc(1, sizeof(Chunk));
@@ -123,8 +126,14 @@ static ASTNode* parse_chunk(Parser* parser, TokenKind fail) {
             case TOKEN_IF:
                 stmt = parse_if_stmt(parser);
                 break;
+            case TOKEN_WHILE:
+                stmt = parse_while_stmt(parser);
+                break;
+            case TOKEN_FOR:
+                stmt = parse_for_stmt(parser);
+                break;
             case TOKEN_RETURN:
-                stmt = parse_return(parser);
+                stmt = parse_return_stmt(parser);
                 break;
 
             case TOKEN_SEMICOLON:
@@ -140,7 +149,6 @@ static ASTNode* parse_chunk(Parser* parser, TokenKind fail) {
     }
 
     if(chunk != NULL) {
-        node->chunk = *chunk;
         memcpy(&(node->chunk), chunk, sizeof(Chunk));
         free(chunk);
     }
@@ -229,43 +237,17 @@ static ASTNode* parse_local_function_stmt(Parser* parser) {
     return node;
 }
 
-static ASTNode* parse_condition(Parser* parser) {
-    ASTNode* cond = parse_expr(parser);
-    if(!cond) {
-        FATAL("Expected condition");
-    }
-
-    return cond;
-}
-
-static ASTNode* parse_if_cond_then_block(Parser* parser) {
-    ASTNode* block = make_node(ASTNODE_COND_THEN_BLOCK);
-    block->cond_then_block.cond = parse_condition(parser);
-
-    if(!consume_token(parser, TOKEN_THEN)) {
-        FAILED_EXPECTATION("THEN");
-    }
-
-    block->cond_then_block.scope = enter_scope(parser->scope_tracker, block);
-    block->cond_then_block.scope->name = "_COND";
-    block->cond_then_block.body = parse_chunk(parser, TOKEN_END);
-
-    leave_scope(parser->scope_tracker);
-
-    return block;
-}
-
 static ASTNode* parse_if_stmt(Parser* parser) {
     ASTNode* node = make_node(ASTNODE_IF_STMT);
     IfStmt* if_stmt = calloc(1, sizeof(IfStmt));
     if_stmt->if_cond_then_blocks = init_ast_node_list();
     advance_parser(parser); // eat IF
 
-    ASTNode* cond_then_block = parse_if_cond_then_block(parser);
+    ASTNode* cond_then_block = parse_cond_then_block(parser);
     add_to_ast_node_list(&if_stmt->if_cond_then_blocks, cond_then_block);
 
     while(consume_token(parser, TOKEN_ELSEIF)) {
-        ASTNode* maybe_a_cond_then_block = parse_if_cond_then_block(parser);
+        ASTNode* maybe_a_cond_then_block = parse_cond_then_block(parser);
         add_to_ast_node_list(&if_stmt->if_cond_then_blocks, maybe_a_cond_then_block);
     }
 
@@ -273,7 +255,7 @@ static ASTNode* parse_if_stmt(Parser* parser) {
         ASTNode* else_block = make_node(ASTNODE_CHUNK);
         if_stmt->else_scope = enter_scope(parser->scope_tracker, else_block);
         if_stmt->else_scope->name = "_ELSE";
-        if_stmt->else_body = parse_chunk(parser, TOKEN_END);
+        if_stmt->else_body = parse_chunk(parser);
         leave_scope(parser->scope_tracker);
     }
 
@@ -287,7 +269,103 @@ static ASTNode* parse_if_stmt(Parser* parser) {
     return node;
 }
 
-static ASTNode* parse_return(Parser* parser) {
+static ASTNode* parse_while_stmt(Parser* parser) {
+    if(!consume_token(parser, TOKEN_WHILE)) {
+        FAILED_EXPECTATION("WHILE");
+    }
+
+    ASTNode* node = make_node(ASTNODE_WHILE_STMT);
+    WhileStmt* while_stmt = calloc(1, sizeof(WhileStmt));
+    while_stmt->cond = parse_expr(parser);
+    while_stmt->while_scope = enter_scope(parser->scope_tracker, node);
+    while_stmt->while_scope->name = "_WHILE"; // this is so stupid
+
+    if(!consume_token(parser, TOKEN_DO)) {
+        FAILED_EXPECTATION("DO");
+    }
+    while_stmt->body = parse_chunk(parser);
+    if(!consume_token(parser, TOKEN_END)) {
+        FAILED_EXPECTATION("END");
+    }
+    leave_scope(parser->scope_tracker);
+
+    memcpy(&node->while_stmt, while_stmt, sizeof(WhileStmt));
+    free(while_stmt);
+
+    return node;
+}
+
+static ASTNode* parse_for_numeric(Parser* parser, Token* initial_symbol_tok) {
+    INFO("We here %s", token_to_str(initial_symbol_tok));
+    ASTNode* node = make_node(ASTNODE_FOR_NUMERIC_STMT);
+    node->for_stmt.for_scope = enter_scope(parser->scope_tracker, node);
+    node->for_stmt.for_scope->name = "_FOR";
+
+    ASTNode* init_sym = make_node(ASTNODE_SYMBOL);
+    init_sym->symbol.name = strdup(initial_symbol_tok->value);
+    init_sym->symbol.scope = node->for_stmt.for_scope;
+    add_to_symbol_list(node->for_stmt.for_scope->symbol_lookup, &init_sym->symbol);
+    node->for_stmt.loop_var = init_sym;
+    print_symbol_list(node->for_stmt.for_scope->symbol_lookup);
+
+    if(!consume_token(parser, TOKEN_ASSIGN)) {
+        FAILED_EXPECTATION("ASSIGN");
+    }
+    INFO("Parsing rest");
+
+    node->for_stmt.start = parse_expr(parser);
+    INFO("Start");
+    print_ast_node(node->for_stmt.start, 0);
+
+    if(!consume_token(parser, TOKEN_COMMA)) {
+        FAILED_EXPECTATION("COMMA");
+    }
+    node->for_stmt.end = parse_expr(parser);
+    INFO("End");
+    print_ast_node(node->for_stmt.end, 0);
+    if(consume_token(parser, TOKEN_COMMA)) {
+        node->for_stmt.step = parse_expr(parser);
+        INFO("Step");
+        print_ast_node(node->for_stmt.step, 0);
+    }
+
+    if(!consume_token(parser, TOKEN_DO)) {
+        FAILED_EXPECTATION("DO");
+    }
+
+    node->for_stmt.body = parse_chunk(parser);
+    INFO("BODY");
+    print_ast_node(node->for_stmt.body, 0);
+    if(!consume_token(parser, TOKEN_END)) {
+        FAILED_EXPECTATION("END");
+    }
+
+    leave_scope(parser->scope_tracker);
+
+    return node;
+}
+
+static ASTNode* parse_for_stmt(Parser* parser) {
+    INFO("Parsing for loop");
+    if(!consume_token(parser, TOKEN_FOR)) {
+        FAILED_EXPECTATION("FOR");
+    }
+    ASTNode* node = NULL;
+    Token* ident = consume_token_and_clone(parser, TOKEN_IDENT);
+    switch(parser->curr_token->kind) {
+        case TOKEN_ASSIGN:
+            node = parse_for_numeric(parser, ident);
+            break;
+        default:
+            FATAL("Shouldn't have reached here");
+    }
+    /* leave_scope(parser->scope_tracker); */
+    free(ident);
+
+    return node;
+}
+
+static ASTNode* parse_return_stmt(Parser* parser) {
     if(!consume_token(parser, TOKEN_RETURN)) {
         FAILED_EXPECTATION("RETURN");
     }
@@ -478,6 +556,7 @@ static ASTNode* parse_suffixed_expr(Parser* parser) {
                     Token* ident = consume_token_and_clone(parser, TOKEN_IDENT);
                     char* method_name = strdup(ident->value);
                     ASTNode* func_call = parse_func_call(parser, method_name);
+                    free(ident);
                     add_to_ast_node_list(&expr->suffixed_expr.suffix_list, func_call);
                     break;
                 }
@@ -532,7 +611,7 @@ static ASTNode* parse_func_expr(Parser* parser) {
         }
     }
 
-    ASTNode* chunk = parse_chunk(parser, TOKEN_END);
+    ASTNode* chunk = parse_chunk(parser);
     func->body = chunk;
 
     if(!consume_token(parser, TOKEN_END)) {
@@ -595,6 +674,23 @@ static ASTNodeList* parse_func_args(Parser* parser) {
     }
 
     return args;
+}
+
+static ASTNode* parse_cond_then_block(Parser* parser) {
+    ASTNode* block = make_node(ASTNODE_COND_THEN_BLOCK);
+    block->cond_then_block.cond = parse_expr(parser);
+
+    if(!consume_token(parser, TOKEN_THEN)) {
+        FAILED_EXPECTATION("THEN");
+    }
+
+    block->cond_then_block.scope = enter_scope(parser->scope_tracker, block);
+    block->cond_then_block.scope->name = "_COND";
+    block->cond_then_block.body = parse_chunk(parser);
+
+    leave_scope(parser->scope_tracker);
+
+    return block;
 }
 
 static ASTNode* parse_table_literal(Parser* parser) {
@@ -764,8 +860,8 @@ static ASTNode* parse_num_literal(Parser* parser) {
 =====================================================
 */
 
-static Scope* enter_scope(ScopeTracker* tracker, ASTNode* curr_func) {
-    Scope* new_scope = create_scope(tracker->curr_scope, curr_func);
+static Scope* enter_scope(ScopeTracker* tracker, ASTNode* curr_block) {
+    Scope* new_scope = create_scope(tracker->curr_scope, curr_block);
     tracker->curr_scope = new_scope;
     return new_scope;
 }
