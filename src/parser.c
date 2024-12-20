@@ -49,6 +49,7 @@ static Symbol* resolve_symbol(Scope* curr_scope, const char* name);
 static void add_symbol_to_scope(Scope* scope, Symbol* symbol);
 static Symbol* look_for_symbol(SymbolList* symbol_lookup, const char* name);
 static Scope* create_scope(Scope* parent, ASTNode* curr_function);
+static void init_env_symbols(Scope* scope);
 
 /* operator precedence */
 static Precedence prec_from_infix_op(InfixOperator op);
@@ -56,12 +57,10 @@ static InfixOperator infix_op_from_tok(Token* tok);
 static PrefixOperator prefix_op_from_tok(Token* tok);
 
 /* helpers */
-static ASTNode* make_node(NodeKind kind);
 static Token* consume_token_and_clone(Parser* parser, TokenKind expected);
 static bool consume_token(Parser* parser, TokenKind expected);
 static ASTNode* str_from_ident(Token* ident);
 static bool fail_tok(Token* token);
-static bool expect_token(Parser* parser, TokenKind expected);
 static void advance_parser(Parser* parser);
 
 /* technically useless but great for debugging */
@@ -82,6 +81,7 @@ Parser* init_parser(Lexer* lexer) {
     global_scope->must_be_closed = false;
     global_scope->name = "_MAIN";
     global_scope->symbol_lookup = init_symbol_list();
+    init_env_symbols(global_scope);
     scope_tracker->curr_scope = global_scope;
     scope_tracker->global = global_scope;
     parser->scope_tracker = scope_tracker;
@@ -104,7 +104,6 @@ ASTNode* parse(Parser* parser) {
 }
 
 // fail is the token at which we stop processing the chunk
-/* static ASTNode* parse_chunk(Parser* parser, TokenKind fail) { */
 static ASTNode* parse_chunk(Parser* parser) {
     ASTNode* node = make_node(ASTNODE_CHUNK);
 
@@ -296,7 +295,6 @@ static ASTNode* parse_while_stmt(Parser* parser) {
 }
 
 static ASTNode* parse_for_numeric(Parser* parser, Token* initial_symbol_tok) {
-    INFO("We here %s", token_to_str(initial_symbol_tok));
     ASTNode* node = make_node(ASTNODE_FOR_NUMERIC_STMT);
     node->for_stmt.for_scope = enter_scope(parser->scope_tracker, node);
     node->for_stmt.for_scope->name = "_FOR";
@@ -306,27 +304,19 @@ static ASTNode* parse_for_numeric(Parser* parser, Token* initial_symbol_tok) {
     init_sym->symbol.scope = node->for_stmt.for_scope;
     add_to_symbol_list(node->for_stmt.for_scope->symbol_lookup, &init_sym->symbol);
     node->for_stmt.loop_var = init_sym;
-    print_symbol_list(node->for_stmt.for_scope->symbol_lookup);
 
     if(!consume_token(parser, TOKEN_ASSIGN)) {
         FAILED_EXPECTATION("ASSIGN");
     }
-    INFO("Parsing rest");
 
     node->for_stmt.start = parse_expr(parser);
-    INFO("Start");
-    print_ast_node(node->for_stmt.start, 0);
 
     if(!consume_token(parser, TOKEN_COMMA)) {
         FAILED_EXPECTATION("COMMA");
     }
     node->for_stmt.end = parse_expr(parser);
-    INFO("End");
-    print_ast_node(node->for_stmt.end, 0);
     if(consume_token(parser, TOKEN_COMMA)) {
         node->for_stmt.step = parse_expr(parser);
-        INFO("Step");
-        print_ast_node(node->for_stmt.step, 0);
     }
 
     if(!consume_token(parser, TOKEN_DO)) {
@@ -334,8 +324,6 @@ static ASTNode* parse_for_numeric(Parser* parser, Token* initial_symbol_tok) {
     }
 
     node->for_stmt.body = parse_chunk(parser);
-    INFO("BODY");
-    print_ast_node(node->for_stmt.body, 0);
     if(!consume_token(parser, TOKEN_END)) {
         FAILED_EXPECTATION("END");
     }
@@ -346,7 +334,6 @@ static ASTNode* parse_for_numeric(Parser* parser, Token* initial_symbol_tok) {
 }
 
 static ASTNode* parse_for_stmt(Parser* parser) {
-    INFO("Parsing for loop");
     if(!consume_token(parser, TOKEN_FOR)) {
         FAILED_EXPECTATION("FOR");
     }
@@ -359,7 +346,6 @@ static ASTNode* parse_for_stmt(Parser* parser) {
         default:
             FATAL("Shouldn't have reached here");
     }
-    /* leave_scope(parser->scope_tracker); */
     free(ident);
 
     return node;
@@ -561,6 +547,11 @@ static ASTNode* parse_suffixed_expr(Parser* parser) {
                     break;
                 }
             default:
+                /* Experimental simplification. If something goes wrong
+                 * this might be the reason */
+                if(expr->suffixed_expr.suffix_list == NULL) {
+                    *expr = *expr->suffixed_expr.primary_expr;
+                }
                 return expr;
         }
     }
@@ -917,6 +908,13 @@ static Scope* create_scope(Scope* parent, ASTNode* curr_function) {
     return scope;
 }
 
+static void init_env_symbols(Scope* scope) {
+    Symbol* print_s = malloc(sizeof(Symbol));
+    print_s->name = "print";
+    print_s->scope = scope;
+    add_symbol_to_scope(scope, print_s);
+}
+
 static void advance_parser(Parser* parser) {
     Token* consumed_token = parser->curr_token;
     parser->curr_token = parser->peeked_token;
@@ -1075,10 +1073,6 @@ static bool fail_tok(Token* token) {
     }
 }
 
-static bool expect_token(Parser* parser, TokenKind expected) {
-    return parser->curr_token && parser->peeked_token->kind == expected;
-}
-
 void annihilate_parser(Parser** parser) {
     annihilate_token(&(*parser)->curr_token);
     annihilate_token(&(*parser)->peeked_token);
@@ -1089,7 +1083,7 @@ void annihilate_parser(Parser** parser) {
     *parser = NULL;
 }
 
-static ASTNode* make_node(NodeKind kind) {
+ASTNode* make_node(NodeKind kind) {
     ASTNode* node = calloc(1, sizeof(ASTNode));
     node->kind = kind;
     return node;

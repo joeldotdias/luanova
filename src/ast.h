@@ -110,12 +110,14 @@ typedef struct {
 } SymbolList;
 
 void ast_dump(ASTNode* root);
+void proc_ast(ASTNode* root);
 SymbolList* init_symbol_list();
 void add_to_symbol_list(SymbolList* list, Symbol* symbol);
 void print_symbol_list(const SymbolList* list);
 ASTNodeList* init_ast_node_list();
 void add_to_ast_node_list(ASTNodeList** list_ref, ASTNode* node);
 void print_ast_node_list(const ASTNodeList* list);
+ASTNode* make_node(NodeKind kind);
 void print_ast_node(ASTNode* node, size_t indent);
 char* node_to_str(const ASTNode* node);
 

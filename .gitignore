@@ -1,4 +1,5 @@
 luanova
 src/parserbak.c
+src/proc_ast.c
 *.out
 *.o

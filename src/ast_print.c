@@ -201,13 +201,11 @@ static void print_expr_stmt(ExprStmt* expr_stmt, size_t indent) {
         for(size_t i = 0; i < expr_stmt->var_expr_list->count; i++) {
             print_ast_node(expr_stmt->var_expr_list->nodes[i], indent + 2);
         }
+        INDENTED(indent + 1, COLOR_KEY "RHS:");
     }
 
-    if(expr_stmt->expr_list != NULL) {
-        INDENTED(indent + 1, COLOR_KEY "RHS:");
-        for(size_t i = 0; i < expr_stmt->expr_list->count; i++) {
-            print_ast_node(expr_stmt->expr_list->nodes[i], indent + 2);
-        }
+    for(size_t i = 0; i < expr_stmt->expr_list->count; i++) {
+        print_ast_node(expr_stmt->expr_list->nodes[i], indent + 2);
     }
 }
 
