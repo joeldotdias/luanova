@@ -3,6 +3,7 @@
 
 #include "ast.h"
 #include "hashtab.h"
+#include <stdlib.h>
 
 struct Environment {
     HashTable* lookup;
@@ -45,12 +46,20 @@ typedef struct {
 } Object;
 
 Eval* init_eval();
-void eval(Eval* e, ASTNode* root);
+void eval_program(Eval* e, ASTNode* root);
 Environment* make_env(Environment* outer);
 Object* look_in_env(Environment* env, const char* key);
-bool env_upsert(Environment* env, const char* key, const Object* obj);
+void env_upsert(Environment* env, const char* key, const Object* obj);
 void remove_from_env(Environment* env, const char* key);
 void show_env(Environment* env);
 void annihilate_env(Environment* env);
+void annihilate_eval(Eval* e);
+
+typedef struct {
+    Object** objects;
+    size_t capacity;
+} ObjectList;
+
+ObjectList* objects_from_nodes(Eval* e, ASTNodeList* node_list);
 
 #endif

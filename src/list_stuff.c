@@ -94,3 +94,43 @@ void print_ast_node_list(const ASTNodeList* list) {
         print_ast_node(list->nodes[i], 0);
     }
 }
+
+/* void free_symbol_list(SymbolList* list) {
+    if(!list) {
+        return;
+    }
+    INFO("Freeing symbol list %p", list);
+    if(!list->symbols) {
+        INFO("Null array");
+        free(list);
+        return;
+    }
+
+    for(size_t i = 0; i < list->count; i++) {
+        if(!list->symbols[i]) {
+            break;
+        }
+        INFO("Freeing symbol list [%zu] %s", i, list->symbols[i]->name);
+        if(list->symbols[i]->name) {
+            free(list->symbols[i]->name);
+        }
+        free(list->symbols[i]);
+    }
+    INFO("Reached end of symbol freeing loop");
+
+    free(list->symbols);
+    free(list);
+}
+
+void free_ast_node_list(ASTNodeList* list) {
+    if(!list) {
+        return;
+    }
+
+    for(size_t i = 0; i < list->count; i++) {
+        free_node(list->nodes[i]);
+    }
+
+    free(list->nodes);
+    free(list);
+} */

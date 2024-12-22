@@ -439,8 +439,6 @@ char* node_to_str(const ASTNode* node) {
     switch(node->kind) {
         case ASTNODE_CHUNK:
             return "ASTNODE_CHUNK";
-        case ASTNODE_BLOCK:
-            return "ASTNODE_BLOCK";
         // statements
         case ASTNODE_LOCAL_VAR_DECL:
             return "ASTNODE_LOCAL_VAR_DECL";

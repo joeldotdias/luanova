@@ -15,7 +15,8 @@ int main() {
     /* proc_ast(root); */
     ast_dump(root);
     Eval* e = init_eval();
-    eval(e, root);
+    eval_program(e, root);
+    annihilate_eval(e);
     annihilate_parser(&parser);
 
     return 0;

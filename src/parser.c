@@ -32,7 +32,7 @@ static ASTNode* parse_primary_expr(Parser* parser);
 static ASTNode* parse_func_expr(Parser* parser);
 static SymbolList* parse_func_params(Parser* parser);
 static ASTNode* parse_cond_then_block(Parser* parser);
-static ASTNode* parse_func_call(Parser* parser, const char* method_name);
+static ASTNode* parse_func_call(Parser* parser, char* method_name);
 static ASTNodeList* parse_func_args(Parser* parser);
 static ASTNode* parse_table_literal(Parser* parser);
 static ASTNode* parse_table_element(Parser* parser);
@@ -542,6 +542,7 @@ static ASTNode* parse_suffixed_expr(Parser* parser) {
                     Token* ident = consume_token_and_clone(parser, TOKEN_IDENT);
                     char* method_name = strdup(ident->value);
                     ASTNode* func_call = parse_func_call(parser, method_name);
+                    free(ident->value);
                     free(ident);
                     add_to_ast_node_list(&expr->suffixed_expr.suffix_list, func_call);
                     break;
@@ -633,7 +634,7 @@ static SymbolList* parse_func_params(Parser* parser) {
     return params;
 }
 
-static ASTNode* parse_func_call(Parser* parser, const char* method_name) {
+static ASTNode* parse_func_call(Parser* parser, char* method_name) {
     if(!consume_token(parser, TOKEN_LPAREN)) {
         FAILED_EXPECTATION("LPAREN");
     }
@@ -1089,7 +1090,7 @@ ASTNode* make_node(NodeKind kind) {
     return node;
 }
 
-// this is serves no real purpose except making scopes clear while printing the ast
+// this serves no real purpose except making scopes clear while printing the ast
 static void maybe_give_scope_a_name(ASTNode* lhs, ASTNode* rhs) {
     bool needs_free = false;
     char* ident = get_name_val_from_node(lhs, &needs_free);

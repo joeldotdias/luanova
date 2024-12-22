@@ -21,7 +21,6 @@
 typedef enum {
     // top level
     ASTNODE_CHUNK,
-    ASTNODE_BLOCK,
 
     // statements
     ASTNODE_LOCAL_VAR_DECL,
@@ -40,7 +39,6 @@ typedef enum {
 
     // expressions
     ASTNODE_EXPR_STMT,
-    ASTNODE_REASSIGNMENT_EXPR,
     ASTNODE_FUNC_EXPR,
     ASTNODE_FUNC_CALL_EXPR,
     ASTNODE_INDEX_EXPR,
@@ -120,6 +118,9 @@ void print_ast_node_list(const ASTNodeList* list);
 ASTNode* make_node(NodeKind kind);
 void print_ast_node(ASTNode* node, size_t indent);
 char* node_to_str(const ASTNode* node);
+void free_node(ASTNode* node);
+void free_symbol_list(SymbolList* list);
+void free_ast_node_list(ASTNodeList* list);
 
 struct Scope {
     ASTNode* block;
@@ -198,14 +199,13 @@ typedef struct {
 
 typedef struct {
     Symbol* name;
-    ASTNodeList* Selectors;
-    // FuncExpr* func_expr;
+    ASTNodeList* selectors;
     ASTNode* func_expr;
 } FuncStmt;
 
 typedef struct {
     ASTNodeList* args;
-    const char* method_name; // if it is a method, else NULL
+    char* method_name; // if it is a method, else NULL
 } FuncCall;
 
 typedef struct {
@@ -232,9 +232,7 @@ typedef struct {
  * Quite integral and has several types
  * object.field -> { base: object; suffix: field_selector(field) }
  * array[5] -> { base: array; suffix: index_expr([5]) }
- * object.field -> { base: object; suffix: field_selector(field) }
- * object.field -> { base: object; suffix: field_selector(field) }
- * object.field -> { base: object; suffix: field_selector(field) }
+ * object.fn(p1, p2) -> { base: object; suffix: field_selector(fn), func_call(p1, p2) }
  */
 typedef struct {
     ASTNode* primary_expr;

@@ -4,4 +4,16 @@ a, b = 7.4, c
 c = "Ben"
 print(a + 90)
 print(c)
-print("Hello, World!")
+local res = print("Hello, World!")
+print("Hello,", "World!")
+print(res)
+
+local fn = function(p1)
+	print(p1(c))
+	return c
+end
+print(fn)
+local passed = fn(function(va)
+	return "Function as value"
+end)
+print(passed)

@@ -1,4 +1,5 @@
 #include "hashtab.h"
+#include <stdlib.h>
 
 static unsigned long hash(const char* str) {
     unsigned long hash = 5381;
@@ -85,11 +86,17 @@ void* ht_get(HashTable* ht, const char* key) {
 
 #undef HT_NOT_FOUND
 
-void ht_free(HashTable* ht) {
-    if(!ht) {
+void ht_free(HashTable* table) {
+    if(!table) {
         return;
     }
 
-    free(ht->entries);
-    free(ht);
+    for(size_t i = 0; i < table->capacity; i++) {
+        if(table->entries[i].occupied) {
+            free(table->entries[i].value);
+        }
+    }
+
+    free(table->entries);
+    free(table);
 }
