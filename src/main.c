@@ -13,7 +13,7 @@ int main() {
     Parser* parser = init_parser(lexer);
     ASTNode* root = parse(parser);
     /* proc_ast(root); */
-    ast_dump(root);
+    /* ast_dump(root); */
     Eval* e = init_eval();
     eval_chunk(e, root);
     annihilate_eval(e);

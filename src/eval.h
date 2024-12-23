@@ -48,9 +48,9 @@ typedef struct {
 Eval* init_eval();
 void eval_chunk(Eval* e, ASTNode* chunk);
 Environment* make_env(Environment* outer);
-Object* look_in_env(Environment* env, const char* key);
-void env_upsert(Environment* env, const char* key, const Object* obj);
-void remove_from_env(Environment* env, const char* key);
+Object* look_in_env(Environment* env, const void* key, size_t key_len);
+void env_upsert(Environment* env, const void* key, size_t key_len, const Object* obj);
+void remove_from_env(Environment* env, const char* key, size_t key_len);
 void show_env(Environment* env);
 void annihilate_env(Environment* env);
 void annihilate_eval(Eval* e);

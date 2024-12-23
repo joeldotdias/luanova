@@ -11,21 +11,21 @@
 #define MAX_STRING_LENGTH 256
 
 typedef struct {
-    char key[MAX_STRING_LENGTH];
+    void* key;
     void* value;
     bool occupied;
 } HashEntry;
 
 typedef struct {
-    HashEntry* entries;
+    HashEntry** entries;
     size_t size;
     size_t capacity;
 } HashTable;
 
 HashTable* init_ht();
-void* ht_get(HashTable* ht, const char* key);
-bool ht_insert(HashTable* ht, const char* key, const void* value);
-void ht_delete(HashTable* ht, const char* key);
+void* ht_get(HashTable* ht, const void* key, size_t key_len);
+bool ht_insert(HashTable* ht, const void* key, size_t key_len, const void* value);
+void ht_delete(HashTable* ht, const void* key, size_t key_len);
 void ht_free(HashTable* ht);
 
 #endif

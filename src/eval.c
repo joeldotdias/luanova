@@ -8,6 +8,7 @@
 #include "hashtab.h"
 #include "shared.h"
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,7 +34,7 @@ Environment* extend_func_env(const FuncVal* func_val, const ObjectList* args) {
     if(args) {
         for(size_t i = 0; i < args->capacity; i++) {
             const char* param_name = func_val->params->symbols[i]->name;
-            env_upsert(new_env, param_name, args->objects[i]);
+            env_upsert(new_env, param_name, strlen(param_name) + 1, args->objects[i]);
         }
     }
 
@@ -125,7 +126,8 @@ static void eval_local_assignment(Eval* e, LocalAssignment* asgmt) {
             expr = malloc(sizeof(Object));
             expr->kind = OBJECT_NIL;
         }
-        env_upsert(e->env, asgmt->var_list->symbols[i]->name, expr);
+        env_upsert(e->env, asgmt->var_list->symbols[i]->name,
+                   strlen(asgmt->var_list->symbols[i]->name) + 1, expr);
     }
     /* show_env(e->env); */
 }
@@ -141,14 +143,15 @@ static void eval_reassignment(Eval* e, ASTNodeList* lhs, ASTNodeList* rhs) {
                   node_to_str(lhs->nodes[i]));
         }
         Object* expr = eval_expression(e, rhs->nodes[i]);
-        env_upsert(e->env, lhs->nodes[i]->symbol.name, expr);
+        env_upsert(e->env, lhs->nodes[i]->symbol.name,
+                   strlen(lhs->nodes[i]->symbol.name) + 1, expr);
     }
     /* show_env(e->env); */
 }
 
 static void eval_local_func_assignment(Eval* e, FuncStmt* func_stmt) {
     Object* func = eval_func_expr(e, func_stmt->func_expr);
-    env_upsert(e->env, func_stmt->name->name, func);
+    env_upsert(e->env, func_stmt->name->name, strlen(func_stmt->name->name) + 1, func);
 }
 
 static void eval_expr_stmt(Eval* e, ExprStmt* expr_stmt) {
@@ -190,12 +193,14 @@ static void eval_numeric_for_stmt(Eval* e, ForStmt* for_stmt) {
         FATAL("Loop variable must be a symbol | Recvd %s",
               node_to_str(for_stmt->loop_var));
     }
-    env_upsert(e->env, for_stmt->loop_var->symbol.name, start);
+    env_upsert(e->env, for_stmt->loop_var->symbol.name,
+               strlen(for_stmt->loop_var->symbol.name) + 1, start);
 
     while(start->num_val < end->num_val) {
         eval_chunk(e, for_stmt->body);
         start->num_val += step->num_val;
-        env_upsert(e->env, for_stmt->loop_var->symbol.name, start);
+        env_upsert(e->env, for_stmt->loop_var->symbol.name,
+                   strlen(for_stmt->loop_var->symbol.name) + 1, start);
     }
 }
 
@@ -238,7 +243,7 @@ static Object* eval_expression(Eval* e, ASTNode* expr) {
             break;
 
         case ASTNODE_SYMBOL:
-            res = look_in_env(e->env, expr->symbol.name);
+            res = look_in_env(e->env, expr->symbol.name, strlen(expr->symbol.name) + 1);
             if(!res) {
                 res = try_builtin(expr->symbol.name);
             }
@@ -437,11 +442,11 @@ Environment* make_env(Environment* outer) {
     return e;
 }
 
-Object* look_in_env(Environment* env, const char* key) {
+Object* look_in_env(Environment* env, const void* key, size_t key_len) {
     Environment* curr_looking_in = env;
 
     while(curr_looking_in) {
-        Object* found = ht_get(curr_looking_in->lookup, key);
+        Object* found = ht_get(curr_looking_in->lookup, key, key_len);
         if(found) {
             return found;
         }
@@ -451,14 +456,16 @@ Object* look_in_env(Environment* env, const char* key) {
     return NULL;
 }
 
-void env_upsert(Environment* env, const char* key, const Object* obj) {
-    bool upserted = ht_insert(env->lookup, key, obj);
+void env_upsert(Environment* env, const void* key, size_t key_len, const Object* obj) {
+    bool upserted = ht_insert(env->lookup, key, key_len, obj);
     if(!upserted) {
-        FATAL("Couldn't upsert %s in env", key);
+        FATAL("Couldn't upsert in env");
     }
 }
 
-void remove_from_env(Environment* env, const char* key) { ht_delete(env->lookup, key); }
+void remove_from_env(Environment* env, const char* key, size_t key_len) {
+    ht_delete(env->lookup, key, key_len);
+}
 
 void show_env(Environment* env) {
     if(!env || !env->lookup) {
@@ -470,10 +477,10 @@ void show_env(Environment* env) {
 
     HashTable* table = env->lookup;
     for(size_t i = 0; i < table->capacity; i++) {
-        HashEntry entry = table->entries[i];
-        if(entry.occupied && entry.value != NULL) {
-            Object* obj = (Object*)entry.value;
-            printf("%s = ", entry.key);
+        HashEntry* entry = table->entries[i];
+        if(entry->occupied && entry->value != NULL) {
+            Object* obj = (Object*)entry->value;
+            /* printf("%s = ", entry.key); */
 
             switch(obj->kind) {
                 case OBJECT_FUNCTION:

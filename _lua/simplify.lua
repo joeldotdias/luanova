@@ -38,6 +38,8 @@ end
 
 if wv < 0 then
 	print("If execed")
+elseif wv > 100 then
+	print("wv is greater than 100???")
 elseif wv then
 	print("Else if execed")
 else
