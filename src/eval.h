@@ -46,7 +46,7 @@ typedef struct {
 } Object;
 
 Eval* init_eval();
-void eval_program(Eval* e, ASTNode* root);
+void eval_chunk(Eval* e, ASTNode* chunk);
 Environment* make_env(Environment* outer);
 Object* look_in_env(Environment* env, const char* key);
 void env_upsert(Environment* env, const char* key, const Object* obj);

@@ -12,13 +12,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* static void atom_to_object(ASTNode* node, Object* obj); */
+static void eval_stmt(Eval* e, ASTNode* node);
 static Object* atom_to_object(ASTNode* node);
 static bool assert_binary_op_types(Object* left, Object* right, InfixOperator op);
 static Object* eval_expression(Eval* e, ASTNode* expr);
 static Object* eval_binary_expr(Object* left, Object* right, InfixOperator op);
 static Object* eval_builtin(Object* builtin, ObjectList* args);
 static Object* try_builtin(const char* name);
+static bool is_truthy(Object* obj);
 
 Eval* init_eval() {
     Eval* e = malloc(sizeof(Eval));
@@ -29,15 +30,15 @@ Eval* init_eval() {
 
 Environment* extend_func_env(const FuncVal* func_val, const ObjectList* args) {
     Environment* new_env = make_env(func_val->environemnt);
-    for(size_t i = 0; i < args->capacity; i++) {
-        const char* param_name = func_val->params->symbols[i]->name;
-        env_upsert(new_env, param_name, args->objects[i]);
+    if(args) {
+        for(size_t i = 0; i < args->capacity; i++) {
+            const char* param_name = func_val->params->symbols[i]->name;
+            env_upsert(new_env, param_name, args->objects[i]);
+        }
     }
 
     return new_env;
 }
-
-void eval_node(Eval* e, ASTNode* node);
 
 Object* eval_func_call(Eval* e, Object* func, ObjectList* args) {
     if(func->kind == OBJECT_BUILTIN) {
@@ -59,12 +60,11 @@ Object* eval_func_call(Eval* e, Object* func, ObjectList* args) {
             ret = eval_expression(e, node->return_stmt.return_val);
             break;
         } else {
-            eval_node(e, node);
+            eval_stmt(e, node);
         }
     }
 
     e->env = curr_env;
-    /* FATAL(); */
 
     return ret;
 }
@@ -114,6 +114,98 @@ static Object* eval_func_expr(Eval* e, ASTNode* expr) {
     func->func_val->body = &expr->func_expr.body->chunk;
 
     return func;
+}
+
+static void eval_local_assignment(Eval* e, LocalAssignment* asgmt) {
+    for(size_t i = 0; i < asgmt->var_list->count; i++) {
+        Object* expr;
+        if(asgmt->expr_list->count >= i) {
+            expr = eval_expression(e, asgmt->expr_list->nodes[i]);
+        } else {
+            expr = malloc(sizeof(Object));
+            expr->kind = OBJECT_NIL;
+        }
+        env_upsert(e->env, asgmt->var_list->symbols[i]->name, expr);
+    }
+    /* show_env(e->env); */
+}
+
+static void eval_reassignment(Eval* e, ASTNodeList* lhs, ASTNodeList* rhs) {
+    if(lhs->count != rhs->count) {
+        FATAL("Counts on lhs and rhs didn't match");
+    }
+
+    for(size_t i = 0; i < lhs->count; i++) {
+        if(lhs->nodes[i]->kind != ASTNODE_SYMBOL) {
+            FATAL("Expected a symbol for reassignment | Got %s",
+                  node_to_str(lhs->nodes[i]));
+        }
+        Object* expr = eval_expression(e, rhs->nodes[i]);
+        env_upsert(e->env, lhs->nodes[i]->symbol.name, expr);
+    }
+    /* show_env(e->env); */
+}
+
+static void eval_local_func_assignment(Eval* e, FuncStmt* func_stmt) {
+    Object* func = eval_func_expr(e, func_stmt->func_expr);
+    env_upsert(e->env, func_stmt->name->name, func);
+}
+
+static void eval_expr_stmt(Eval* e, ExprStmt* expr_stmt) {
+    if(expr_stmt->var_expr_list != NULL) {
+        eval_reassignment(e, expr_stmt->var_expr_list, expr_stmt->expr_list);
+    } else {
+        for(size_t i = 0; i < expr_stmt->expr_list->count; i++) {
+            /* Might cause problems */
+            Object* _res = eval_expression(e, expr_stmt->expr_list->nodes[i]);
+            free(_res);
+        }
+    }
+}
+
+static void eval_if_stmt(Eval* e, IfStmt* if_stmt) {
+    bool evaled = false;
+
+    for(size_t i = 0; i < if_stmt->if_cond_then_blocks->count; i++) {
+        CondThenBlock block = if_stmt->if_cond_then_blocks->nodes[i]->cond_then_block;
+        Object* cond = eval_expression(e, block.cond);
+        if(is_truthy(cond)) {
+            eval_chunk(e, block.body);
+            evaled = true;
+            break;
+        }
+    }
+
+    if(!evaled && if_stmt->else_body) {
+        eval_chunk(e, if_stmt->else_body);
+    }
+}
+
+static void eval_numeric_for_stmt(Eval* e, ForStmt* for_stmt) {
+    Object *start = eval_expression(e, for_stmt->start),
+           *step = eval_expression(e, for_stmt->step),
+           *end = eval_expression(e, for_stmt->end);
+
+    if(for_stmt->loop_var->kind != ASTNODE_SYMBOL) {
+        FATAL("Loop variable must be a symbol | Recvd %s",
+              node_to_str(for_stmt->loop_var));
+    }
+    env_upsert(e->env, for_stmt->loop_var->symbol.name, start);
+
+    while(start->num_val < end->num_val) {
+        eval_chunk(e, for_stmt->body);
+        start->num_val += step->num_val;
+        env_upsert(e->env, for_stmt->loop_var->symbol.name, start);
+    }
+}
+
+static void eval_while_stmt(Eval* e, WhileStmt* while_stmt) {
+    Object* loop_cond = eval_expression(e, while_stmt->cond);
+
+    while(is_truthy(loop_cond)) {
+        eval_chunk(e, while_stmt->body);
+        loop_cond = eval_expression(e, while_stmt->cond);
+    }
 }
 
 static Object* eval_expression(Eval* e, ASTNode* expr) {
@@ -275,55 +367,25 @@ Object* eval_binary_expr(Object* left, Object* right, InfixOperator op) {
     return result;
 }
 
-void eval_local_assignment(Eval* e, LocalAssignment* asgmt) {
-    for(size_t i = 0; i < asgmt->var_list->count; i++) {
-        Object* expr; // = malloc(sizeof(Object));
-        if(asgmt->expr_list->count >= i) {
-            expr = eval_expression(e, asgmt->expr_list->nodes[i]);
-        } else {
-            expr = malloc(sizeof(Object));
-            expr->kind = OBJECT_NIL;
-        }
-        env_upsert(e->env, asgmt->var_list->symbols[i]->name, expr);
-    }
-    /* show_env(e->env); */
-}
-
-void eval_reassignment(Eval* e, ASTNodeList* lhs, ASTNodeList* rhs) {
-    if(lhs->count != rhs->count) {
-        FATAL("Counts on lhs and rhs didn't match");
-    }
-
-    for(size_t i = 0; i < lhs->count; i++) {
-        if(lhs->nodes[i]->kind != ASTNODE_SYMBOL) {
-            FATAL("Expected a symbol for reassignment | Got %s",
-                  node_to_str(lhs->nodes[i]));
-        }
-        Object* expr = eval_expression(e, rhs->nodes[i]);
-        env_upsert(e->env, lhs->nodes[i]->symbol.name, expr);
-    }
-    /* show_env(e->env); */
-}
-
-static void eval_expr_stmt(Eval* e, ExprStmt* expr_stmt) {
-    if(expr_stmt->var_expr_list != NULL) {
-        eval_reassignment(e, expr_stmt->var_expr_list, expr_stmt->expr_list);
-    } else {
-        for(size_t i = 0; i < expr_stmt->expr_list->count; i++) {
-            /* Might cause problems */
-            Object* _res = eval_expression(e, expr_stmt->expr_list->nodes[i]);
-            free(_res);
-        }
-    }
-}
-
-void eval_node(Eval* e, ASTNode* node) {
+static void eval_stmt(Eval* e, ASTNode* node) {
     switch(node->kind) {
         case ASTNODE_LOCAL_VAR_DECL:
             eval_local_assignment(e, &node->assignment);
             break;
+        case ASTNODE_FUNC_STMT:
+            eval_local_func_assignment(e, &node->func_stmt);
+            break;
         case ASTNODE_EXPR_STMT:
             eval_expr_stmt(e, &node->expr_stmt);
+            break;
+        case ASTNODE_IF_STMT:
+            eval_if_stmt(e, &node->if_stmt);
+            break;
+        case ASTNODE_FOR_NUMERIC_STMT:
+            eval_numeric_for_stmt(e, &node->for_stmt);
+            break;
+        case ASTNODE_WHILE_STMT:
+            eval_while_stmt(e, &node->while_stmt);
             break;
 
         default:
@@ -331,14 +393,13 @@ void eval_node(Eval* e, ASTNode* node) {
     }
 }
 
-void eval_program(Eval* e, ASTNode* root) {
-    if(root->kind != ASTNODE_CHUNK) {
-        free(root);
+void eval_chunk(Eval* e, ASTNode* chunk) {
+    if(chunk->kind != ASTNODE_CHUNK) {
+        free(chunk);
         FATAL("Expected chunk");
     }
-    Chunk chunk = root->chunk;
-    for(size_t i = 0; i < chunk.stmteez->count; i++) {
-        eval_node(e, chunk.stmteez->nodes[i]);
+    for(size_t i = 0; i < chunk->chunk.stmteez->count; i++) {
+        eval_stmt(e, chunk->chunk.stmteez->nodes[i]);
     }
 }
 
@@ -509,6 +570,23 @@ static Object* atom_to_object(ASTNode* atom) {
 
     return obj;
 }
+
+/* From the docs
+ *  Conditionals consider false and nil as false
+ * and anything else as true.
+ */
+static bool is_truthy(Object* obj) {
+    bool res;
+    if(obj->kind == OBJECT_BOOLEAN) {
+        res = obj->bool_val;
+    } else if(obj->kind == OBJECT_NIL) {
+        res = false;
+    } else {
+        res = true;
+    }
+
+    return res;
+};
 
 void annihilate_env(Environment* env) {
     if(!env) {
