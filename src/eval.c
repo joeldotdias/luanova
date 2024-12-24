@@ -21,6 +21,7 @@ static Object* eval_binary_expr(Object* left, Object* right, InfixOperator op);
 static Object* eval_builtin(Object* builtin, ObjectList* args);
 static Object* try_builtin(const char* name);
 static bool is_truthy(Object* obj);
+static void object_to_str(Object* obj);
 
 Eval* init_eval() {
     Eval* e = malloc(sizeof(Eval));
@@ -70,6 +71,7 @@ Object* eval_func_call(Eval* e, Object* func, ObjectList* args) {
     return ret;
 }
 
+void print_table(TableVal* table);
 Object* eval_suffixed_expr(Eval* e, SuffixedExpr* suffixed_expr) {
     ASTNode* primary = suffixed_expr->primary_expr;
     if(!suffixed_expr->suffix_list) {
@@ -95,6 +97,32 @@ Object* eval_suffixed_expr(Eval* e, SuffixedExpr* suffixed_expr) {
                     res = eval_func_call(e, initial, args);
                     break;
                 }
+            case ASTNODE_INDEX_EXPR:
+            case ASTNODE_FIELD_SELECTOR:
+                {
+                    TableVal* table = initial->table_val;
+                    Object* idx = eval_expression(e, suffix->index_expr.expr);
+                    // this is really bad. Find a better way
+                    if(idx->kind == OBJECT_STRING) {
+                        for(size_t i = 0; i < table->pairs->capacity; i++) {
+                            HashEntry* entry = table->pairs->entries[i];
+                            if(entry) {
+                                Object* str_key = (Object*)entry->key;
+                                if(str_key->kind != OBJECT_STRING) {
+                                    continue;
+                                }
+                                if(strcmp(idx->str_val, str_key->str_val) == 0) {
+                                    res = (Object*)entry->value;
+                                    break;
+                                }
+                            }
+                        }
+                    } else {
+                        res = ht_get(table->pairs, idx, sizeof(Object));
+                    }
+
+                    break;
+                }
             default:
                 UNIMPLEMENTED();
                 INFO("Recvd suffix %s", node_to_str(suffix));
@@ -116,6 +144,90 @@ static Object* eval_func_expr(Eval* e, ASTNode* expr) {
 
     return func;
 }
+void print_table(TableVal* table) {
+    if(!table || !table->pairs) {
+        printf("nil\n");
+        return;
+    }
+
+    printf("{\n");
+    for(size_t i = 0; i < table->pairs->capacity; i++) {
+        HashEntry* entry = table->pairs->entries[i];
+        if(!entry || !entry->occupied)
+            continue;
+
+        // Print key
+        Object* key = entry->key;
+        printf("  [");
+        if(key->kind == OBJECT_NUMBER) {
+            printf("%.14g", key->num_val);
+        } else if(key->kind == OBJECT_STRING) {
+            printf("\"%s\"", key->str_val);
+        } else {
+            printf("<unknown key type>");
+        }
+        printf("] = ");
+
+        // Print value
+        Object* value = entry->value;
+        if(!value) {
+            printf("nil");
+        } else {
+            switch(value->kind) {
+                case OBJECT_NUMBER:
+                    printf("%.14g", value->num_val);
+                    break;
+                case OBJECT_STRING:
+                    printf("\"%s\"", value->str_val);
+                    break;
+                case OBJECT_BOOLEAN:
+                    printf("%s", value->bool_val ? "true" : "false");
+                    break;
+                case OBJECT_TABLE:
+                    printf("<table>"); // Could recursively print but might cause cycles
+                    break;
+                case OBJECT_FUNCTION:
+                    printf("<function>");
+                    break;
+                case OBJECT_BUILTIN:
+                    printf("<builtin>");
+                    break;
+                case OBJECT_NIL:
+                    printf("nil");
+                    break;
+                default:
+                    printf("<unknown value type>");
+            }
+        }
+        printf(",\n");
+    }
+    printf("}\n");
+}
+
+static Object* eval_table_expr(Eval* e, TableLiteralExpr* table_expr) {
+    Object* table_obj = malloc(sizeof(Object));
+    table_obj->kind = OBJECT_TABLE;
+    TableVal* table = malloc(sizeof(TableVal));
+    table_obj->table_val = table;
+
+    table->pairs = init_ht();
+    size_t curr_idx = 1;
+    for(size_t i = 0; i < table_expr->expr_list->count; i++) {
+        TableElement* elem = &table_expr->expr_list->nodes[i]->table_elem;
+        Object* key;
+        if(!elem->key) {
+            key = malloc(sizeof(Object));
+            key->kind = OBJECT_NUMBER;
+            key->num_val = curr_idx++;
+        } else {
+            key = eval_expression(e, elem->key);
+        }
+        ht_insert(table->pairs, key, sizeof(Object), eval_expression(e, elem->value));
+    }
+    print_table(table);
+
+    return table_obj;
+}
 
 static void eval_local_assignment(Eval* e, LocalAssignment* asgmt) {
     for(size_t i = 0; i < asgmt->var_list->count; i++) {
@@ -129,7 +241,7 @@ static void eval_local_assignment(Eval* e, LocalAssignment* asgmt) {
         env_upsert(e->env, asgmt->var_list->symbols[i]->name,
                    strlen(asgmt->var_list->symbols[i]->name) + 1, expr);
     }
-    /* show_env(e->env); */
+    /*show_env(e->env); */
 }
 
 static void eval_reassignment(Eval* e, ASTNodeList* lhs, ASTNodeList* rhs) {
@@ -221,6 +333,10 @@ static Object* eval_expression(Eval* e, ASTNode* expr) {
             res = eval_func_expr(e, expr);
             break;
 
+        case ASTNODE_TABLE_LITERAL:
+            res = eval_table_expr(e, &expr->table_literal);
+            break;
+
         case ASTNODE_NUM_LITERAL:
         case ASTNODE_BOOL_LITERAL:
         case ASTNODE_STR_LITERAL:
@@ -229,6 +345,10 @@ static Object* eval_expression(Eval* e, ASTNode* expr) {
                 res = atom_to_object(expr);
                 break;
             }
+
+        case ASTNODE_INDEX_EXPR:
+            res = eval_expression(e, expr->index_expr.expr);
+            break;
 
         case ASTNODE_BINARY_EXPR:
             {
@@ -467,6 +587,32 @@ void remove_from_env(Environment* env, const char* key, size_t key_len) {
     ht_delete(env->lookup, key, key_len);
 }
 
+static void object_to_str(Object* obj) {
+    switch(obj->kind) {
+        case OBJECT_FUNCTION:
+            printf("function");
+            break;
+        case OBJECT_TABLE:
+            printf("table");
+            break;
+        case OBJECT_NUMBER:
+            printf("%g", obj->num_val);
+            break;
+        case OBJECT_STRING:
+            printf("\"%s\"", obj->str_val);
+            break;
+        case OBJECT_BOOLEAN:
+            printf("%s", obj->bool_val ? "true" : "false");
+            break;
+        case OBJECT_NIL:
+            printf("nil");
+            break;
+        default:
+            printf("<unknown type>");
+    }
+    printf("\n");
+}
+
 void show_env(Environment* env) {
     if(!env || !env->lookup) {
         printf("Empty or invalid environment\n");
@@ -481,27 +627,7 @@ void show_env(Environment* env) {
         if(entry->occupied && entry->value != NULL) {
             Object* obj = (Object*)entry->value;
             /* printf("%s = ", entry.key); */
-
-            switch(obj->kind) {
-                case OBJECT_FUNCTION:
-                    printf("function");
-                    break;
-                case OBJECT_NUMBER:
-                    printf("%g", obj->num_val);
-                    break;
-                case OBJECT_STRING:
-                    printf("\"%s\"", obj->str_val);
-                    break;
-                case OBJECT_BOOLEAN:
-                    printf("%s", obj->bool_val ? "true" : "false");
-                    break;
-                case OBJECT_NIL:
-                    printf("nil");
-                    break;
-                default:
-                    printf("<unknown type>");
-            }
-            printf("\n");
+            object_to_str(obj);
         }
     }
     INFO("======================");

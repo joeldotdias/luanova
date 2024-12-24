@@ -718,7 +718,11 @@ static ASTNode* parse_table_element(Parser* parser) {
 
     if(parser->curr_token->kind == TOKEN_IDENT) {
         if(parser->peeked_token->kind == TOKEN_ASSIGN) {
-            elem->key = parse_symbol(parser, true);
+            /* elem->key = parse_symbol(parser, true); */
+            elem->key = malloc(sizeof(ASTNode));
+            elem->key->kind = ASTNODE_STR_LITERAL;
+            elem->key->str_literal.str_val = strdup(parser->curr_token->value);
+            advance_parser(parser);
             if(!consume_token(parser, TOKEN_ASSIGN)) {
                 FAILED_EXPECTATION("ASSIGN");
             }

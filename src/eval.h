@@ -11,6 +11,8 @@ struct Environment {
 };
 
 typedef struct Environment Environment;
+typedef struct Object Object;
+typedef struct ObjectList ObjectList;
 
 typedef struct {
     Environment* env;
@@ -22,11 +24,15 @@ typedef struct {
     Environment* environemnt;
 } FuncVal;
 
+typedef struct {
+    HashTable* pairs; // non-integer keys
+} TableVal;
+
 typedef enum {
     BUILTIN_PRINT,
 } BuiltinFunc;
 
-typedef struct {
+struct Object {
     enum {
         OBJECT_NUMBER,
         OBJECT_STRING,
@@ -41,9 +47,10 @@ typedef struct {
         char* str_val;
         bool bool_val;
         FuncVal* func_val;
+        TableVal* table_val;
         BuiltinFunc builtin_func;
     };
-} Object;
+};
 
 Eval* init_eval();
 void eval_chunk(Eval* e, ASTNode* chunk);
@@ -55,10 +62,10 @@ void show_env(Environment* env);
 void annihilate_env(Environment* env);
 void annihilate_eval(Eval* e);
 
-typedef struct {
+struct ObjectList {
     Object** objects;
     size_t capacity;
-} ObjectList;
+};
 
 ObjectList* objects_from_nodes(Eval* e, ASTNodeList* node_list);
 

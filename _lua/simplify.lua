@@ -45,3 +45,22 @@ elseif wv then
 else
 	print("Else execed")
 end
+
+local t = { 4, [1.5] = 5, [0.5] = 9, 6, sidx = 7 }
+local ti, tf = t[2], t[1.5]
+print(ti, tf)
+local ts = t.sidx
+print(ts)
+
+local get_t = function()
+	return {
+		new_a = 9,
+		new_t = {
+			lem = function(disp)
+				print(disp)
+			end,
+		},
+	}
+end
+
+get_t().new_t.lem("Lemons")
